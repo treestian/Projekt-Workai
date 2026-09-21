@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "SuHgJQ6SXjAwd10VTFMtUX9OLm5r1i7M/yNwl6PO7xo=",
+  "Source": "TeamsTimeBot.Api",
+  "BasePath": "_content/TeamsTimeBot.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
