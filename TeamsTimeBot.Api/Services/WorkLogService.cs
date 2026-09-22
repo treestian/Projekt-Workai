@@ -304,37 +304,6 @@ public class WorkLogService
             Tasks = taskSummaries
         };
     }
-
-    public async Task<WorkLog?> StopActiveWorkAsync(
-        string userAzureId,
-        int taskId)
-    {
-        var user = await _dbContext.Users
-            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
-
-        if (user == null)
-        {
-            return null;
-        }
-
-        var activeWorkLog = await _dbContext.WorkLogs
-            .FirstOrDefaultAsync(x =>
-                x.UserId == user.Id &&
-                x.TaskId == taskId &&
-                x.EndedAt == null);
-
-        if (activeWorkLog == null)
-        {
-            return null;
-        }
-
-        activeWorkLog.EndedAt = DateTime.UtcNow;
-        activeWorkLog.Status = "Zakonczone";
-
-        await _dbContext.SaveChangesAsync();
-
-        return activeWorkLog;
-    }
 }
 
 public sealed record StartWorkResult(

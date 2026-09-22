@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Models;
 using TeamsTimeBot.Api.Data;
 using TeamsTimeBot.Api.Models;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace TeamsTimeBot.Api.Services;
 
@@ -60,7 +62,7 @@ public class NotificationService
 
     private async Task ProcessSingleNotificationAsync(
         JsonElement notification)
-    {
+    {  
         var clientState = GetStringProperty(
             notification,
             "clientState");
@@ -68,7 +70,23 @@ public class NotificationService
         var expectedClientState =
             _configuration["Graph:ClientState"];
 
-        if (clientState != expectedClientState)
+        if (string.IsNullOrWhiteSpace(clientState) ||
+            string.IsNullOrWhiteSpace(expectedClientState))
+        {
+            _logger.LogWarning(
+                "Notification rejected because clientState is missing or not configured.");
+
+            return;
+        }
+
+        var clientStateBytes = Encoding.UTF8.GetBytes(clientState);
+        var expectedClientStateBytes =
+            Encoding.UTF8.GetBytes(expectedClientState);
+
+        if (clientStateBytes.Length != expectedClientStateBytes.Length ||
+            !CryptographicOperations.FixedTimeEquals(
+                clientStateBytes,
+                expectedClientStateBytes))
         {
             _logger.LogWarning(
                 "Received notification with invalid clientState.");

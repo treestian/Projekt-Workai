@@ -4,9 +4,10 @@ using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/tasks")]
-[AllowAnonymous]
+
 public class TasksController : ControllerBase
 {
     private readonly TaskService _taskService;

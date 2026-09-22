@@ -5,8 +5,15 @@ using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Connector.Authentication;
 using TeamsTimeBot.Api.Bots;
+using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddAuthentication("Bearer")
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
 {
@@ -29,7 +36,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddHostedService<UserSyncBackgroundService>();
-builder.Services.AddScoped<MessageParserService>();
 builder.Services.AddScoped<WorkLogService>();
 builder.Services.AddScoped<AIService>();
 builder.Services.AddScoped<TaskService>();
@@ -71,6 +77,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -1,24 +1,26 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/users")]
 public class UsersController : ControllerBase
 {
-    private readonly GraphService _graphService;
     private readonly UserSyncService _syncService;
     private readonly UserService _userService;
+    private readonly AuthorizationService _authorizationService;
 
     public UsersController(
-        GraphService graphService,
         UserSyncService syncService,
-        UserService userService)
+        UserService userService,
+        AuthorizationService authorizationService)
     {
-        _graphService = graphService;
         _syncService = syncService;
         _userService = userService;
+        _authorizationService = authorizationService;
     }
 
     [HttpGet]
@@ -29,17 +31,14 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-    [HttpGet("sync-test")]
-    public async Task<IActionResult> SyncTest()
-    {
-        var users = await _graphService.GetUsersAsync();
-
-        return Ok(users);
-    }
-
     [HttpPost("sync")]
     public async Task<IActionResult> Sync()
     {
+        if (!await IsCurrentUserAdminAsync())
+        {
+            return Forbid();
+        }
+
         var result = await _syncService.SyncUsersAsync();
 
         return Ok(result);
@@ -48,6 +47,11 @@ public class UsersController : ControllerBase
     [HttpGet("sync-settings")]
     public async Task<IActionResult> GetSyncSettings()
     {
+        if (!await IsCurrentUserAdminAsync())
+        {
+            return Forbid();
+        }
+
         var settings = await _userService.GetSyncSettingsAsync();
 
         return Ok(new
@@ -61,6 +65,11 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateSyncSettings(
         [FromBody] UpdateSyncSettingsRequest request)
     {
+        if (!await IsCurrentUserAdminAsync())
+        {
+            return Forbid();
+        }
+
         var settings = await _userService.UpdateSyncSettingsAsync(
             request.IntervalHours);
 
@@ -76,7 +85,18 @@ public class UsersController : ControllerBase
             updatedAt = settings.UpdatedAt
         });
     }
+
+    private async Task<bool> IsCurrentUserAdminAsync()
+    {
+        var userAzureId = User.FindFirst("oid")?.Value;
+
+        if (string.IsNullOrWhiteSpace(userAzureId))
+        {
+            return false;
+        }
+
+        return await _authorizationService.IsAdminAsync(userAzureId);
+    }
 }
 
 public record UpdateSyncSettingsRequest(int IntervalHours);
-

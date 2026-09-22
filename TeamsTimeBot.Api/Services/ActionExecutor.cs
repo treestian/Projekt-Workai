@@ -1,3 +1,4 @@
+using TeamsTimeBot.Api.DTOs;
 using TeamsTimeBot.Api.Models;
 
 namespace TeamsTimeBot.Api.Services;
@@ -31,10 +32,9 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -52,10 +52,9 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        var result =
-            await _workLogService.StartWorkAsync(
-                userAzureId,
-                resolution.Task.Id);
+        var result = await _workLogService.StartWorkAsync(
+            userAzureId,
+            resolution.Task.Id);
 
         if (result == null)
         {
@@ -78,10 +77,9 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -99,10 +97,9 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        var result =
-            await _workLogService.StopWorkAsync(
-                userAzureId,
-                resolution.Task.Id);
+        var result = await _workLogService.StopWorkAsync(
+            userAzureId,
+            resolution.Task.Id);
 
         if (result == null)
         {
@@ -120,10 +117,9 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -141,9 +137,8 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        var task =
-            await _taskService.FinishTaskAsync(
-                resolution.Task.Id);
+        var task = await _taskService.FinishTaskAsync(
+            resolution.Task.Id);
 
         if (task == null)
         {
@@ -163,17 +158,15 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        if (string.IsNullOrWhiteSpace(
-            response.NewTaskName))
+        if (string.IsNullOrWhiteSpace(response.NewTaskName))
         {
             return ActionExecutionResult.MissingTaskName();
         }
 
-        var task =
-            await _taskService.CreateTaskAsync(
-                userAzureId,
-                response.NewTaskName,
-                response.Description);
+        var task = await _taskService.CreateTaskAsync(
+            userAzureId,
+            response.NewTaskName,
+            response.Description);
 
         if (task == null)
         {
@@ -189,10 +182,9 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -210,33 +202,22 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        // =========================================================
-        // EDYCJA ZADANIA
-        // =========================================================
-
-        var task =
-            await _taskService.EditTaskAsync(
-                resolution.Task.Id,
-                response.NewTaskName,
-                response.Description);
+        var task = await _taskService.EditTaskAsync(
+            resolution.Task.Id,
+            response.NewTaskName,
+            response.Description);
 
         if (task == null)
         {
             return ActionExecutionResult.Error();
         }
 
-        // =========================================================
-        // JEŻELI AI PRZEKAZAŁO KOMENTARZ,
-        // ZAPISUJEMY GO DO BAZY
-        // =========================================================
-
         if (!string.IsNullOrWhiteSpace(response.Comment))
         {
-            var comment =
-                await _commentService.AddCommentAsync(
-                    userAzureId,
-                    resolution.Task.Id,
-                    response.Comment);
+            var comment = await _commentService.AddCommentAsync(
+                userAzureId,
+                resolution.Task.Id,
+                response.Comment);
 
             if (comment == null)
             {
@@ -253,10 +234,9 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -274,17 +254,15 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        if (string.IsNullOrWhiteSpace(
-            response.Comment))
+        if (string.IsNullOrWhiteSpace(response.Comment))
         {
             return ActionExecutionResult.MissingComment();
         }
 
-        var comment =
-            await _commentService.AddCommentAsync(
-                userAzureId,
-                resolution.Task.Id,
-                response.Comment);
+        var comment = await _commentService.AddCommentAsync(
+            userAzureId,
+            resolution.Task.Id,
+            response.Comment);
 
         if (comment == null)
         {
@@ -300,11 +278,10 @@ public class ActionExecutor
         string userAzureId,
         LLMResponse response)
     {
-        var resolution =
-            await _taskResolver.ResolveAsync(
-                response.TaskId,
-                response.TaskName,
-                includeCompleted: true);
+        var resolution = await _taskResolver.ResolveAsync(
+            response.TaskId,
+            response.TaskName,
+            includeCompleted: true);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -328,12 +305,11 @@ public class ActionExecutor
             return ActionExecutionResult.MissingManualTime();
         }
 
-        var result =
-            await _workLogService.AddManualTimeAsync(
-                userAzureId,
-                resolution.Task.Id,
-                response.ManualMinutes.Value,
-                response.WorkDate);
+        var result = await _workLogService.AddManualTimeAsync(
+            userAzureId,
+            resolution.Task.Id,
+            response.ManualMinutes.Value,
+            response.WorkDate);
 
         if (result == null)
         {
@@ -345,43 +321,32 @@ public class ActionExecutor
             resolution.Task.Name);
     }
 
-    // =========================================================
-    // MÓJ RAPORT CZASU PRACY
-    // =========================================================
-
-    public async Task<object> GetMyWorkReportAsync(
+    public async Task<WorkReportResult> GetMyWorkReportAsync(
         string userAzureId,
         DateTime startDate,
         DateTime endDate)
     {
-        var report =
-            await _reportService.GetMyReportAsync(
-                userAzureId,
-                startDate,
-                endDate);
+        var report = await _reportService.GetMyReportAsync(
+            userAzureId,
+            startDate,
+            endDate);
 
         if (report == null)
         {
-            return new
+            return new WorkReportResult
             {
-                status = "ERROR"
+                StatusCode = 500
             };
         }
 
-        return new
+        return new WorkReportResult
         {
-            status = "SUCCESS",
-            report
+            StatusCode = 200,
+            Report = report
         };
     }
 
-
-    // =========================================================
-    // RAPORT KONKRETNEGO UŻYTKOWNIKA
-    // TYLKO ADMIN
-    // =========================================================
-
-    public async Task<object> GetUserWorkReportAsync(
+    public async Task<WorkReportResult> GetUserWorkReportAsync(
         string requestingUserAzureId,
         string targetUserAzureId,
         DateTime startDate,
@@ -389,129 +354,121 @@ public class ActionExecutor
     {
         try
         {
-            var report =
-                await _reportService.GetUserReportAsync(
-                    requestingUserAzureId,
-                    targetUserAzureId,
-                    startDate,
-                    endDate);
+            var report = await _reportService.GetUserReportAsync(
+                requestingUserAzureId,
+                targetUserAzureId,
+                startDate,
+                endDate);
 
             if (report == null)
             {
-                return new
+                return new WorkReportResult
                 {
-                    status = "NOT_FOUND" //404
+                    StatusCode = 404
                 };
             }
 
-            return new
+            return new WorkReportResult
             {
-                status = "SUCCESS",//zwracaj status requestu nie teskt 200
-                report
+                StatusCode = 200,
+                Report = report
             };
         }
         catch (UnauthorizedAccessException)
         {
-            return new
+            return new WorkReportResult
             {
-                status = "FORBIDDEN"
+                StatusCode = 403
             };
         }
     }
 
-
-    // =========================================================
-    // RAPORT CAŁEGO ZESPOŁU
-    // TYLKO ADMIN
-    // =========================================================
-
-    public async Task<object> GetTeamWorkReportAsync(
+    public async Task<TeamWorkReportResult> GetTeamWorkReportAsync(
         string requestingUserAzureId,
         DateTime startDate,
         DateTime endDate)
     {
         try
         {
-            var report =
-                await _reportService.GetTeamReportAsync(
-                    requestingUserAzureId,
-                    startDate,
-                    endDate);
+            var report = await _reportService.GetTeamReportAsync(
+                requestingUserAzureId,
+                startDate,
+                endDate);
 
             if (report == null)
             {
-                return new
+                return new TeamWorkReportResult
                 {
-                    status = "ERROR"
+                    StatusCode = 500
                 };
             }
 
-            return new
+            return new TeamWorkReportResult
             {
-                status = "SUCCESS",
-                report
+                StatusCode = 200,
+                Report = report
             };
         }
         catch (UnauthorizedAccessException)
         {
-            return new
+            return new TeamWorkReportResult
             {
-                status = "FORBIDDEN"
+                StatusCode = 403
             };
         }
     }
 
-    public async Task<object> FindUserAsync(
+    public async Task<FindUserResult> FindUserAsync(
         string requestingUserAzureId,
         string search)
     {
-        var isAdmin =
-            await _authorizationService.IsAdminAsync(
-                requestingUserAzureId);
+        var isAdmin = await _authorizationService.IsAdminAsync(
+            requestingUserAzureId);
 
         if (!isAdmin)
         {
-            return new
+            return new FindUserResult
             {
-                status = "FORBIDDEN"
+                StatusCode = 403
             };
         }
 
-        var users =
-            await _authorizationService.FindUsersAsync(search);
+        var users = await _authorizationService.FindUsersAsync(search);
 
         if (users.Count == 0)
         {
-            return new
+            return new FindUserResult
             {
-                status = "NOT_FOUND"
+                StatusCode = 404
             };
         }
 
-        return new
+        return new FindUserResult
         {
-            status = "SUCCESS",
-            users = users.Select(x => new
-            {
-                azureId = x.AzureId,
-                displayName = x.DisplayName,
-                email = x.Email
-            }).ToList()
+            StatusCode = 200,
+            Users = users
+                .Select(user => new UserSearchResult
+                {
+                    AzureId = user.AzureId,
+                    DisplayName = user.DisplayName,
+                    Email = user.Email
+                })
+                .ToList()
         };
     }
-
 }
 
 public class ActionExecutionResult
 {
-    public string Status { get; set; } = string.Empty;
+    public int StatusCode { get; set; }
+
+    public string Result { get; set; } = string.Empty;
 
     public int? TaskId { get; set; }
 
     public string? TaskName { get; set; }
 
-    public List<TeamsTimeBot.Api.DTOs.TaskCandidateDto> Candidates { get; set; }
-        = [];
+    public List<TaskCandidateDto> Candidates { get; set; } = [];
 
     public static ActionExecutionResult Success(
         int taskId,
@@ -519,7 +476,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "SUCCESS",
+            StatusCode = 200,
+            Result = "SUCCESS",
             TaskId = taskId,
             TaskName = taskName
         };
@@ -529,16 +487,18 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "NOT_FOUND"
+            StatusCode = 404,
+            Result = "NOT_FOUND"
         };
     }
 
     public static ActionExecutionResult Ambiguous(
-        List<TeamsTimeBot.Api.DTOs.TaskCandidateDto> candidates)
+        List<TaskCandidateDto> candidates)
     {
         return new ActionExecutionResult
         {
-            Status = "AMBIGUOUS",
+            StatusCode = 409,
+            Result = "AMBIGUOUS",
             Candidates = candidates
         };
     }
@@ -549,7 +509,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "NO_ACTIVE_WORK",
+            StatusCode = 404,
+            Result = "NO_ACTIVE_WORK",
             TaskId = taskId,
             TaskName = taskName
         };
@@ -559,7 +520,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "MISSING_TASK_NAME"
+            StatusCode = 400,
+            Result = "MISSING_TASK_NAME"
         };
     }
 
@@ -567,7 +529,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "MISSING_COMMENT"
+            StatusCode = 400,
+            Result = "MISSING_COMMENT"
         };
     }
 
@@ -575,7 +538,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "MISSING_MANUAL_TIME"
+            StatusCode = 400,
+            Result = "MISSING_MANUAL_TIME"
         };
     }
 
@@ -583,7 +547,8 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "ERROR"
+            StatusCode = 500,
+            Result = "ERROR"
         };
     }
 
@@ -593,10 +558,40 @@ public class ActionExecutionResult
     {
         return new ActionExecutionResult
         {
-            Status = "ALREADY_ACTIVE",
+            StatusCode = 409,
+            Result = "ALREADY_ACTIVE",
             TaskId = taskId,
             TaskName = taskName
         };
     }
 }
 
+public class WorkReportResult
+{
+    public int StatusCode { get; set; }
+
+    public WorkReport? Report { get; set; }
+}
+
+public class TeamWorkReportResult
+{
+    public int StatusCode { get; set; }
+
+    public TeamWorkReport? Report { get; set; }
+}
+
+public class FindUserResult
+{
+    public int StatusCode { get; set; }
+
+    public List<UserSearchResult> Users { get; set; } = [];
+}
+
+public class UserSearchResult
+{
+    public string? AzureId { get; set; }
+
+    public string? DisplayName { get; set; }
+
+    public string? Email { get; set; }
+}

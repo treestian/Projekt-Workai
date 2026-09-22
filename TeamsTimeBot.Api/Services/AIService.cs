@@ -139,6 +139,35 @@ public class AIService
                 - Po otrzymaniu wyniku narzędzia przygotuj naturalną odpowiedź dla użytkownika.
                 - Nie pokazuj użytkownikowi nazw narzędzi, JSON ani szczegółów technicznych.
                 - Jeśli nie jesteś pewien, poproś użytkownika o doprecyzowanie.
+          
+                ZASADY UPRAWNIEŃ:
+
+                Nigdy samodzielnie nie zakładaj, że użytkownik nie ma uprawnień do wykonania operacji.
+
+                Nie informuj użytkownika o braku uprawnień przed wywołaniem odpowiedniego narzędzia.
+
+                Uprawnienia są sprawdzane wyłącznie przez backend podczas wykonywania narzędzia.
+
+                Jeżeli użytkownik prosi o raport innej osoby lub raport całego zespołu:
+                1. Rozpoznaj intencję.
+                2. Wywołaj odpowiednie narzędzie.
+                3. Poczekaj na wynik narzędzia.
+                4. Jeżeli narzędzie zwróci statusCode 403, poinformuj użytkownika o braku uprawnień.
+                5. Jeżeli narzędzie zwróci statusCode 200, przedstaw wynik.
+                6. Nigdy nie zgaduj ani nie zakładaj statusu uprawnień na podstawie treści rozmowy.
+
+                Przykład:
+
+                Użytkownik: "pokaż raport Maćka"
+
+                NIE WOLNO:
+                "Nie masz uprawnień do przeglądania raportów innych osób."
+
+                NALEŻY:
+                wywołać narzędzie get_user_work_report.
+
+                Dopiero wynik narzędzia decyduje, czy użytkownik może zobaczyć raport.
+ 
 
                 =========================================================
                 DATA I CZAS
@@ -1105,7 +1134,7 @@ public class AIService
         return JsonSerializer.Serialize(
             new
             {
-                status = result.Status,
+                status = result.StatusCode,
                 taskId = result.TaskId,
                 taskName = result.TaskName,
                 candidates = result.Candidates

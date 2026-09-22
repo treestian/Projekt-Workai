@@ -21,7 +21,7 @@ public class BotEngine
     {
         if (string.IsNullOrWhiteSpace(userAzureId))
         {
-            return "❌ Nie udało się rozpoznać użytkownika.";
+            return "Nie udało się rozpoznać użytkownika.";
         }
         Console.WriteLine(
             $"BOT USER AZURE ID: {userAzureId}");

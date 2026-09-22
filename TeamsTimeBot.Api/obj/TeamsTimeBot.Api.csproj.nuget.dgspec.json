@@ -73,6 +73,10 @@
               "target": "Package",
               "version": "[6.6.0, )"
             },
+            "Microsoft.Identity.Web": {
+              "target": "Package",
+              "version": "[4.15.0, )"
+            },
             "Microsoft.Teams.Apps": {
               "target": "Package",
               "version": "[2.1.0, )"

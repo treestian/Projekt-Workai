@@ -1,17 +1,23 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/worklogs")]
 public class WorkLogsController : ControllerBase
 {
     private readonly WorkLogService _workLogService;
+    private readonly AuthorizationService _authorizationService;
 
-    public WorkLogsController(WorkLogService workLogService)
+    public WorkLogsController(
+        WorkLogService workLogService,
+        AuthorizationService authorizationService)
     {
         _workLogService = workLogService;
+        _authorizationService = authorizationService;
     }
 
     [HttpGet("active")]
@@ -37,6 +43,23 @@ public class WorkLogsController : ControllerBase
         {
             return BadRequest(
                 "Data początkowa nie może być późniejsza niż końcowa.");
+        }
+
+        var requestingUserAzureId =
+            User.FindFirst("oid")?.Value;
+
+        if (string.IsNullOrWhiteSpace(requestingUserAzureId))
+        {
+            return Unauthorized();
+        }
+
+        var canView = await _authorizationService.CanViewUserDataAsync(
+            requestingUserAzureId,
+            userAzureId);
+
+        if (!canView)
+        {
+            return Forbid();
         }
 
         var summary = await _workLogService.GetSummaryAsync(
