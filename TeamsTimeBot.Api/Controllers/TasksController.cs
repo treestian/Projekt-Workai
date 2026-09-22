@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeamsTimeBot.Api.Services;
 
@@ -5,6 +6,7 @@ namespace TeamsTimeBot.Api.Controllers;
 
 [ApiController]
 [Route("api/tasks")]
+[AllowAnonymous]
 public class TasksController : ControllerBase
 {
     private readonly TaskService _taskService;

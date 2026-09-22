@@ -400,13 +400,13 @@ public class ActionExecutor
             {
                 return new
                 {
-                    status = "NOT_FOUND"
+                    status = "NOT_FOUND" //404
                 };
             }
 
             return new
             {
-                status = "SUCCESS",
+                status = "SUCCESS",//zwracaj status requestu nie teskt 200
                 report
             };
         }
