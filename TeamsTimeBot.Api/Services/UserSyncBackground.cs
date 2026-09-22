@@ -1,8 +1,5 @@
 namespace TeamsTimeBot.Api.Services;
 
-using Microsoft.EntityFrameworkCore;
-using TeamsTimeBot.Api.Data;
-
 public class UserSyncBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -31,9 +28,6 @@ public class UserSyncBackgroundService : BackgroundService
                 var syncService = scope.ServiceProvider
                     .GetRequiredService<UserSyncService>();
 
-                var db = scope.ServiceProvider
-                    .GetRequiredService<AppDbContext>();
-
                 var result = await syncService.SyncUsersAsync();
 
                 _logger.LogInformation(
@@ -44,27 +38,32 @@ public class UserSyncBackgroundService : BackgroundService
                     result.Added,
                     result.Updated,
                     result.Deactivated);
+
+                var userService = scope.ServiceProvider
+                    .GetRequiredService<UserService>();
+
+                var settings = await userService.GetSyncSettingsAsync();
+
+                await Task.Delay(
+                    TimeSpan.FromHours(settings.UserSyncIntervalHours),
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
                 _logger.LogError(
                     ex,
                     "Error occurred during user synchronization.");
-            }
-
-            using (var scope = _scopeFactory.CreateScope())
-            {
-                var db = scope.ServiceProvider
-                    .GetRequiredService<AppDbContext>();
-
-                var intervalHours = await db.SyncSettings
-                    .Select(x => (int?)x.UserSyncIntervalHours)
-                    .FirstOrDefaultAsync(stoppingToken) ?? 24;
 
                 await Task.Delay(
-                    TimeSpan.FromHours(intervalHours),
+                    TimeSpan.FromMinutes(1),
                     stoppingToken);
             }
         }
     }
 }
+

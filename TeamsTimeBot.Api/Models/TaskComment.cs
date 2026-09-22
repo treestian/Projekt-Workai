@@ -11,4 +11,7 @@ public class TaskComment
     public string Comment { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; }
+    public TaskItem Task { get; set; } = null!;
+
+    public User Author { get; set; } = null!;
 }

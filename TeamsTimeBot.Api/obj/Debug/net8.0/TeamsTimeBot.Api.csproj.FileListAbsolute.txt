@@ -208,3 +208,4 @@
 /Users/sebastianborek/Desktop/Projekt Workai/TeamsTimeBot.Api/bin/Debug/net8.0/Newtonsoft.Json.dll
 /Users/sebastianborek/Desktop/Projekt Workai/TeamsTimeBot.Api/bin/Debug/net8.0/OpenAI.dll
 /Users/sebastianborek/Desktop/Projekt Workai/TeamsTimeBot.Api/bin/Debug/net8.0/System.Net.ServerSentEvents.dll
+/Users/sebastianborek/Desktop/Projekt Workai/TeamsTimeBot.Api/obj/Debug/net8.0/TeamsTimeBot.Api.sourcelink.json

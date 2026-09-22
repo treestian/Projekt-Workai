@@ -40,7 +40,8 @@ builder.Services.AddScoped<TaskResolver>();
 builder.Services.AddScoped<ActionExecutor>();
 builder.Services.AddScoped<AuthorizationService>();
 builder.Services.AddScoped<ReportService>();
-
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<NotificationService>();
 
 builder.Services.AddSingleton<
     BotFrameworkAuthentication,

@@ -28,24 +28,23 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TeamsMessage>()
             .HasIndex(x => x.GraphMessageId)
             .IsUnique();
-
         modelBuilder.Entity<TaskItem>()
-            .HasOne<User>()
+            .HasOne(x => x.CreatedBy)
             .WithMany()
             .HasForeignKey(x => x.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
-
         modelBuilder.Entity<TaskComment>()
-            .HasOne<TaskItem>()
-            .WithMany()
+            .HasOne(x => x.Task)
+            .WithMany(task => task.Comments)
             .HasForeignKey(x => x.TaskId)
             .OnDelete(DeleteBehavior.Cascade);
-
         modelBuilder.Entity<TaskComment>()
-            .HasOne<User>()
+            .HasOne(x => x.Author)
             .WithMany()
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+
 
         modelBuilder.Entity<PendingConversation>()
             .Property(x => x.Messages)

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TeamsTimeBot.Api.Data;
 using TeamsTimeBot.Api.Models;
+using TeamsTimeBot.Api.DTOs;
 
 namespace TeamsTimeBot.Api.Services;
 
@@ -60,6 +61,54 @@ public class TaskService
 
         return task;
     }
+
+       
+
+    public async Task<List<TaskDto>> GetTasksAsync()
+    {
+        return await _dbContext.Tasks
+            .AsNoTracking()
+            .OrderByDescending(task => task.UpdatedAt)
+            .Select(task => new TaskDto
+            {
+                Id = task.Id,
+                Name = task.Name,
+                Description = task.Description,
+                IsCompleted = task.IsCompleted,
+                CreatedAt = task.CreatedAt,
+                UpdatedAt = task.UpdatedAt,
+
+                CreatedBy = new UserSummaryDto
+                {
+                    Id = task.CreatedBy.Id,
+                    DisplayName = task.CreatedBy.DisplayName,
+                    Email = task.CreatedBy.Email
+                },
+
+                Comments = task.Comments
+                    .OrderByDescending(comment => comment.CreatedAt)
+                    .Select(comment => new TaskCommentDto
+                    {
+                        Id = comment.Id,
+                        Text = comment.Comment,
+                        CreatedAt = comment.CreatedAt,
+
+                        Author = new UserSummaryDto
+                        {
+                            Id = comment.Author.Id,
+                            DisplayName = comment.Author.DisplayName,
+                            Email = comment.Author.Email
+                        }
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+    }
+
+
+   
+
+
 
     public async Task<TaskItem?> GetByIdAsync(int taskId)
     {

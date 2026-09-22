@@ -45,7 +45,7 @@ public class TeamsBot : ActivityHandler
         {
             await turnContext.SendActivityAsync(
                 MessageFactory.Text(
-                    "❌ Nie otrzymałem żadnej wiadomości."),
+                    " Nie otrzymałem żadnej wiadomości."),
                 cancellationToken);
 
             return;

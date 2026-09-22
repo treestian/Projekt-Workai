@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Graph.Models;
 using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
@@ -32,27 +31,24 @@ public class SubscriptionsController : ControllerBase
 
         if (string.IsNullOrEmpty(notificationUrl))
         {
-            return BadRequest("Graph:NotificationUrl is not configured.");
+            return BadRequest(
+                "Graph:NotificationUrl is not configured.");
         }
 
         if (string.IsNullOrEmpty(clientState))
         {
-            return BadRequest("Graph:ClientState is not configured.");
+            return BadRequest(
+                "Graph:ClientState is not configured.");
         }
 
-        var subscription = new Subscription
-        {
-            ChangeType = "created",
-            NotificationUrl = notificationUrl,
-            Resource = $"/teams/{teamId}/channels/{channelId}/messages",
-            ExpirationDateTime = DateTimeOffset.UtcNow.AddMinutes(50),
-            ClientState = clientState
-        };
+        var subscription =
+            await _graphService.CreateChannelMessageSubscriptionAsync(
+                teamId,
+                channelId,
+                notificationUrl,
+                clientState);
 
-        var result = await _graphService.Client
-            .Subscriptions
-            .PostAsync(subscription);
-
-        return Ok(result);
+        return Ok(subscription);
     }
 }
+

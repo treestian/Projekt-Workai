@@ -17,63 +17,29 @@ public class TeamsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetTeams()
     {
-        var teams = await _graphService.Client.Teams
-            .GetAsync(config =>
-            {
-                config.QueryParameters.Select = new[]
-                {
-                    "id",
-                    "displayName",
-                    "description",
-                    "visibility"
-                };
-            });
+        var teams = await _graphService.GetTeamsAsync();
 
-        return Ok(teams?.Value);
+        return Ok(teams);
     }
 
     [HttpGet("{teamId}/channels")]
     public async Task<IActionResult> GetChannels(string teamId)
     {
-        var channels = await _graphService.Client.Teams[teamId]
-            .Channels
-            .GetAsync(config =>
-            {
-                config.QueryParameters.Select = new[]
-                {
-                    "id",
-                    "displayName",
-                    "description",
-                    "membershipType"
-                };
-            });
+        var channels = await _graphService.GetChannelsAsync(teamId);
 
-        return Ok(channels?.Value);
+        return Ok(channels);
     }
+
     [HttpGet("{teamId}/channels/{channelId}/messages")]
     public async Task<IActionResult> GetMessages(
         string teamId,
         string channelId)
     {
-        var messages = await _graphService.Client
-            .Teams[teamId]
-            .Channels[channelId]
-            .Messages
-            .GetAsync(config =>
-            {
-                config.QueryParameters.Select = new[]
-                {
-                    "id",
-                    "createdDateTime",
-                    "subject",
-                    "body",
-                    "from"
-                };
+        var messages = await _graphService.GetChannelMessagesAsync(
+            teamId,
+            channelId);
 
-                config.QueryParameters.Top = 20;
-            });
-
-        return Ok(messages?.Value);
+        return Ok(messages);
     }
 }
 

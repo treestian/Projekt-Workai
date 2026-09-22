@@ -1,7 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TeamsTimeBot.Api.Data;
-using TeamsTimeBot.Api.Models;
 using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
@@ -12,36 +9,22 @@ public class UsersController : ControllerBase
 {
     private readonly GraphService _graphService;
     private readonly UserSyncService _syncService;
-    private readonly AppDbContext _db;
+    private readonly UserService _userService;
 
     public UsersController(
         GraphService graphService,
         UserSyncService syncService,
-        AppDbContext db)
+        UserService userService)
     {
         _graphService = graphService;
         _syncService = syncService;
-        _db = db;
+        _userService = userService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
-        var users = await _db.Users
-            .AsNoTracking()
-            .OrderBy(u => u.DisplayName)
-            .Select(u => new
-            {
-                id = u.Id,
-                azureId = u.AzureId,
-                displayName = u.DisplayName,
-                email = u.Email,
-                userPrincipalName = u.UserPrincipalName,
-                isActive = u.IsActive,
-                createdAt = u.CreatedAt,
-                updatedAt = u.UpdatedAt
-            })
-            .ToListAsync();
+        var users = await _userService.GetUsersAsync();
 
         return Ok(users);
     }
@@ -49,21 +32,9 @@ public class UsersController : ControllerBase
     [HttpGet("sync-test")]
     public async Task<IActionResult> SyncTest()
     {
-        var users = await _graphService.Client.Users
-            .GetAsync(config =>
-            {
-                config.QueryParameters.Select = new[]
-                {
-                    "id",
-                    "displayName",
-                    "mail",
-                    "userPrincipalName"
-                };
+        var users = await _graphService.GetUsersAsync();
 
-                config.QueryParameters.Top = 20;
-            });
-
-        return Ok(users?.Value);
+        return Ok(users);
     }
 
     [HttpPost("sync")]
@@ -77,7 +48,7 @@ public class UsersController : ControllerBase
     [HttpGet("sync-settings")]
     public async Task<IActionResult> GetSyncSettings()
     {
-        var settings = await GetOrCreateSyncSettingsAsync();
+        var settings = await _userService.GetSyncSettingsAsync();
 
         return Ok(new
         {
@@ -90,15 +61,14 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateSyncSettings(
         [FromBody] UpdateSyncSettingsRequest request)
     {
-        if (request.IntervalHours is < 1 or > 168)
-        {
-            return BadRequest("Interwał musi wynosić od 1 do 168 godzin.");
-        }
+        var settings = await _userService.UpdateSyncSettingsAsync(
+            request.IntervalHours);
 
-        var settings = await GetOrCreateSyncSettingsAsync();
-        settings.UserSyncIntervalHours = request.IntervalHours;
-        settings.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        if (settings == null)
+        {
+            return BadRequest(
+                "Interwał musi wynosić od 1 do 168 godzin.");
+        }
 
         return Ok(new
         {
@@ -106,28 +76,7 @@ public class UsersController : ControllerBase
             updatedAt = settings.UpdatedAt
         });
     }
-
-    private async Task<SyncSettings> GetOrCreateSyncSettingsAsync()
-    {
-        var settings = await _db.SyncSettings.FirstOrDefaultAsync();
-
-        if (settings != null)
-        {
-            return settings;
-        }
-
-        settings = new SyncSettings
-        {
-            UserSyncIntervalHours = 24,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _db.SyncSettings.Add(settings);
-        await _db.SaveChangesAsync();
-
-        return settings;
-    }
-
+}
 
 public record UpdateSyncSettingsRequest(int IntervalHours);
-}
+

@@ -8,20 +8,22 @@ namespace TeamsTimeBot.Api.Services;
 public class WorkLogService
 {
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<WorkLogService> _logger;
 
-    public WorkLogService(AppDbContext dbContext)
+    public WorkLogService(
+        AppDbContext dbContext,
+        ILogger<WorkLogService> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     public async Task<StartWorkResult?> StartWorkAsync(
         string userAzureId,
         int taskId)
     {
-        var user =
-            await _dbContext.Users
-                .FirstOrDefaultAsync(x =>
-                    x.AzureId == userAzureId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
 
         if (user == null)
         {
@@ -30,24 +32,20 @@ public class WorkLogService
 
         var now = DateTime.UtcNow;
 
-        // =========================================================
-        // 1. Sprawdź, czy użytkownik już pracuje nad tym zadaniem
-        // =========================================================
-
-        var existingWorkLog =
-            await _dbContext.WorkLogs
-                .FirstOrDefaultAsync(x =>
-                    x.UserId == user.Id &&
-                    x.TaskId == taskId &&
-                    x.EndedAt == null);
+        var existingWorkLog = await _dbContext.WorkLogs
+            .FirstOrDefaultAsync(x =>
+                x.UserId == user.Id &&
+                x.TaskId == taskId &&
+                x.EndedAt == null);
 
         if (existingWorkLog != null)
         {
-            Console.WriteLine(
-                $"WORKLOG: Already active -> " +
-                $"UserId={user.Id}, " +
-                $"TaskId={taskId}, " +
-                $"WorkLogId={existingWorkLog.Id}");
+            _logger.LogInformation(
+                "Work log already active. " +
+                "UserId: {UserId}, TaskId: {TaskId}, WorkLogId: {WorkLogId}",
+                user.Id,
+                taskId,
+                existingWorkLog.Id);
 
             return new StartWorkResult(
                 existingWorkLog,
@@ -55,55 +53,43 @@ public class WorkLogService
                 true);
         }
 
-        // =========================================================
-        // 2. Sprawdź, czy użytkownik pracuje nad innym zadaniem
-        // =========================================================
-
-        var activeWorkLogs =
-            await _dbContext.WorkLogs
-                .Where(x =>
-                    x.UserId == user.Id &&
-                    x.EndedAt == null)
-                .ToListAsync();
-
-        // =========================================================
-        // 3. Zakończ poprzednie aktywne pomiary
-        // =========================================================
+        var activeWorkLogs = await _dbContext.WorkLogs
+            .Where(x =>
+                x.UserId == user.Id &&
+                x.EndedAt == null)
+            .ToListAsync();
 
         foreach (var activeWorkLog in activeWorkLogs)
         {
             activeWorkLog.EndedAt = now;
             activeWorkLog.Status = "Niedokonczone";
 
-            Console.WriteLine(
-                $"WORKLOG: Interrupted -> " +
-                $"WorkLogId={activeWorkLog.Id}, " +
-                $"TaskId={activeWorkLog.TaskId}");
+            _logger.LogInformation(
+                "Interrupted active work log. " +
+                "WorkLogId: {WorkLogId}, TaskId: {TaskId}",
+                activeWorkLog.Id,
+                activeWorkLog.TaskId);
         }
 
-        // =========================================================
-        // 4. Utwórz nowy pomiar
-        // =========================================================
-
-        var workLog =
-            new WorkLog
-            {
-                UserId = user.Id,
-                TaskId = taskId,
-                StartedAt = now,
-                EndedAt = null,
-                Status = "W trakcie"
-            };
+        var workLog = new WorkLog
+        {
+            UserId = user.Id,
+            TaskId = taskId,
+            StartedAt = now,
+            EndedAt = null,
+            Status = "W trakcie"
+        };
 
         _dbContext.WorkLogs.Add(workLog);
 
         await _dbContext.SaveChangesAsync();
 
-        Console.WriteLine(
-            $"WORKLOG: Started -> " +
-            $"WorkLogId={workLog.Id}, " +
-            $"UserId={user.Id}, " +
-            $"TaskId={taskId}");
+        _logger.LogInformation(
+            "Work started. " +
+            "WorkLogId: {WorkLogId}, UserId: {UserId}, TaskId: {TaskId}",
+            workLog.Id,
+            user.Id,
+            taskId);
 
         return new StartWorkResult(
             workLog,
@@ -115,95 +101,64 @@ public class WorkLogService
         string userAzureId,
         int taskId)
     {
-        var user =
-            await _dbContext.Users
-                .FirstOrDefaultAsync(x =>
-                    x.AzureId == userAzureId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
 
         if (user == null)
         {
             return null;
         }
 
-        var activeWorkLog =
-            await _dbContext.WorkLogs
-                .FirstOrDefaultAsync(x =>
-                    x.UserId == user.Id &&
-                    x.TaskId == taskId &&
-                    x.EndedAt == null);
+        var activeWorkLog = await _dbContext.WorkLogs
+            .FirstOrDefaultAsync(x =>
+                x.UserId == user.Id &&
+                x.TaskId == taskId &&
+                x.EndedAt == null);
 
         if (activeWorkLog == null)
         {
             return null;
         }
 
-        activeWorkLog.EndedAt =
-            DateTime.UtcNow;
-
-        activeWorkLog.Status =
-            "Zakonczone";
+        activeWorkLog.EndedAt = DateTime.UtcNow;
+        activeWorkLog.Status = "Zakonczone";
 
         await _dbContext.SaveChangesAsync();
 
-        Console.WriteLine(
-            $"WORKLOG: Stopped -> " +
-            $"WorkLogId={activeWorkLog.Id}, " +
-            $"TaskId={taskId}");
+        _logger.LogInformation(
+            "Work stopped. " +
+            "WorkLogId: {WorkLogId}, TaskId: {TaskId}",
+            activeWorkLog.Id,
+            taskId);
 
         return activeWorkLog;
     }
 
-
-public async Task<WorkLog?> AddManualTimeAsync(
-    string userAzureId,
-    int taskId,
-    int manualMinutes,
-    DateTime? workDate = null)
-{
-    var user =
-        await _dbContext.Users
-            .FirstOrDefaultAsync(x =>
-                x.AzureId == userAzureId);
-
-    if (user == null)
+    public async Task<WorkLog?> AddManualTimeAsync(
+        string userAzureId,
+        int taskId,
+        int manualMinutes,
+        DateTime? workDate = null)
     {
-        return null;
-    }
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
 
-    if (manualMinutes <= 0)
-    {
-        return null;
-    }
+        if (user == null)
+        {
+            return null;
+        }
 
-    // =========================================================
-    // DATA, KTÓREJ DOTYCZY CZAS PRACY
-    //
-    // Jeżeli użytkownik nie podał daty,
-    // używamy dzisiejszej daty.
-    // =========================================================
+        if (manualMinutes <= 0)
+        {
+            return null;
+        }
 
-    var date =
-        (workDate ?? DateTime.UtcNow).Date;
+        var date = (workDate ?? DateTime.UtcNow).Date;
 
-    // =========================================================
-    // RĘCZNY WPIS CZASU
-    //
-    // Jeżeli użytkownik podał np. 120 minut za 20.09,
-    // zapisujemy:
-    //
-    // 20.09 00:00 → 20.09 02:00
-    //
-    // Dzięki temu wpis należy do właściwego dnia.
-    // =========================================================
+        var startedAt = date;
+        var endedAt = startedAt.AddMinutes(manualMinutes);
 
-    var startedAt =
-        date;
-
-    var endedAt =
-        startedAt.AddMinutes(manualMinutes);
-
-    var workLog =
-        new WorkLog
+        var workLog = new WorkLog
         {
             UserId = user.Id,
             TaskId = taskId,
@@ -212,114 +167,141 @@ public async Task<WorkLog?> AddManualTimeAsync(
             Status = "Zakonczone"
         };
 
-    _dbContext.WorkLogs.Add(workLog);
+        _dbContext.WorkLogs.Add(workLog);
 
-    await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync();
 
-    Console.WriteLine(
-        $"WORKLOG: Manual time -> " +
-        $"WorkLogId={workLog.Id}, " +
-        $"TaskId={taskId}, " +
-        $"Minutes={manualMinutes}, " +
-        $"Date={date:yyyy-MM-dd}");
+        _logger.LogInformation(
+            "Manual work time added. " +
+            "WorkLogId: {WorkLogId}, TaskId: {TaskId}, " +
+            "Minutes: {Minutes}, Date: {Date}",
+            workLog.Id,
+            taskId,
+            manualMinutes,
+            date);
 
-    return workLog;
-}
+        return workLog;
+    }
 
+    public async Task<List<ActiveWorkDto>> GetActiveWorkAsync()
+    {
+        var activeWork = await _dbContext.WorkLogs
+            .AsNoTracking()
+            .Where(log => log.EndedAt == null)
+            .OrderByDescending(log => log.StartedAt)
+            .Select(log => new ActiveWorkDto
+            {
+                Id = log.Id,
 
+                StartedAt = log.StartedAt,
+
+                Status = log.Status,
+
+                Task = _dbContext.Tasks
+                    .Where(task => task.Id == log.TaskId)
+                    .Select(task => new ActiveWorkTaskDto
+                    {
+                        Id = task.Id,
+                        Name = task.Name
+                    })
+                    .FirstOrDefault(),
+
+                User = _dbContext.Users
+                    .Where(user => user.Id == log.UserId)
+                    .Select(user => new ActiveWorkUserDto
+                    {
+                        Id = user.Id,
+                        DisplayName = user.DisplayName,
+                        Email = user.Email
+                    })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        foreach (var workLog in activeWork)
+        {
+            workLog.StartedAt = DateTime.SpecifyKind(
+                workLog.StartedAt,
+                DateTimeKind.Utc);
+        }
+
+        return activeWork;
+    }
 
     public async Task<WorkLogSummaryDto?> GetSummaryAsync(
         string userAzureId,
         DateTime startDate,
         DateTime endDate)
     {
-        var user =
-            await _dbContext.Users
-                .FirstOrDefaultAsync(x =>
-                    x.AzureId == userAzureId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
 
         if (user == null)
         {
             return null;
         }
 
-        var logs =
-            await _dbContext.WorkLogs
-                .Where(x =>
-                    x.UserId == user.Id &&
-                    x.EndedAt.HasValue &&
-                    x.StartedAt >= startDate &&
-                    x.StartedAt <= endDate)
-                .ToListAsync();
+        var logs = await _dbContext.WorkLogs
+            .Where(x =>
+                x.UserId == user.Id &&
+                x.EndedAt.HasValue &&
+                x.StartedAt >= startDate &&
+                x.StartedAt <= endDate)
+            .ToListAsync();
 
-        var taskIds =
-            logs
-                .Select(x => x.TaskId)
-                .Distinct()
-                .ToList();
+        var taskIds = logs
+            .Select(x => x.TaskId)
+            .Distinct()
+            .ToList();
 
-        var tasks =
-            await _dbContext.Tasks
-                .Where(x =>
-                    taskIds.Contains(x.Id))
-                .ToDictionaryAsync(
-                    x => x.Id,
-                    x => x.Name);
+        var tasks = await _dbContext.Tasks
+            .Where(x => taskIds.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => x.Name);
 
-        var taskSummaries =
-            logs
-                .GroupBy(x => x.TaskId)
-                .Select(group =>
+        var taskSummaries = logs
+            .GroupBy(x => x.TaskId)
+            .Select(group =>
+            {
+                var minutes = (int)Math.Round(
+                    group.Sum(x =>
+                        (x.EndedAt!.Value - x.StartedAt)
+                            .TotalMinutes));
+
+                return new WorkLogTaskSummaryDto
                 {
-                    var minutes =
-                        (int)Math.Round(
-                            group.Sum(x =>
-                                (x.EndedAt!.Value -
-                                 x.StartedAt)
-                                    .TotalMinutes));
+                    TaskId = group.Key,
 
-                    return new WorkLogTaskSummaryDto
-                    {
-                        TaskId = group.Key,
+                    TaskName = tasks.TryGetValue(
+                        group.Key,
+                        out var taskName)
+                        ? taskName
+                        : "Nieznane zadanie",
 
-                        TaskName =
-                            tasks.TryGetValue(
-                                group.Key,
-                                out var taskName)
-                                ? taskName
-                                : "Nieznane zadanie",
+                    Minutes = minutes,
 
-                        Minutes = minutes,
+                    Hours = Math.Round(
+                        minutes / 60.0,
+                        2)
+                };
+            })
+            .OrderByDescending(x => x.Minutes)
+            .ToList();
 
-                        Hours =
-                            Math.Round(
-                                minutes / 60.0,
-                                2)
-                    };
-                })
-                .OrderByDescending(
-                    x => x.Minutes)
-                .ToList();
-
-        var totalMinutes =
-            taskSummaries.Sum(
-                x => x.Minutes);
+        var totalMinutes = taskSummaries.Sum(x => x.Minutes);
 
         return new WorkLogSummaryDto
         {
             StartDate = startDate,
             EndDate = endDate,
+            TotalMinutes = totalMinutes,
 
-            TotalMinutes =
-                totalMinutes,
+            TotalHours = Math.Round(
+                totalMinutes / 60.0,
+                2),
 
-            TotalHours =
-                Math.Round(
-                    totalMinutes / 60.0,
-                    2),
-
-            Tasks =
-                taskSummaries
+            Tasks = taskSummaries
         };
     }
 
@@ -327,33 +309,27 @@ public async Task<WorkLog?> AddManualTimeAsync(
         string userAzureId,
         int taskId)
     {
-        var user =
-            await _dbContext.Users
-                .FirstOrDefaultAsync(x =>
-                    x.AzureId == userAzureId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.AzureId == userAzureId);
 
         if (user == null)
         {
             return null;
         }
 
-        var activeWorkLog =
-            await _dbContext.WorkLogs
-                .FirstOrDefaultAsync(x =>
-                    x.UserId == user.Id &&
-                    x.TaskId == taskId &&
-                    x.EndedAt == null);
+        var activeWorkLog = await _dbContext.WorkLogs
+            .FirstOrDefaultAsync(x =>
+                x.UserId == user.Id &&
+                x.TaskId == taskId &&
+                x.EndedAt == null);
 
         if (activeWorkLog == null)
         {
             return null;
         }
 
-        activeWorkLog.EndedAt =
-            DateTime.UtcNow;
-
-        activeWorkLog.Status =
-            "Zakonczone";
+        activeWorkLog.EndedAt = DateTime.UtcNow;
+        activeWorkLog.Status = "Zakonczone";
 
         await _dbContext.SaveChangesAsync();
 

@@ -15,4 +15,8 @@ public class TaskItem
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
-}
+    public User CreatedBy { get; set; } = null!;
+
+    public ICollection<TaskComment> Comments { get; set; }
+        = new List<TaskComment>();
+    }
