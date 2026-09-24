@@ -183,18 +183,36 @@ public class WorkLogService
         return workLog;
     }
 
-    public async Task<List<ActiveWorkDto>> GetActiveWorkAsync()
+    public async Task<List<ActiveWorkDto>> GetActiveWorkAsync(
+        string userAzureId,
+        bool isAdmin)
     {
-        var activeWork = await _dbContext.WorkLogs
+        var query = _dbContext.WorkLogs
             .AsNoTracking()
-            .Where(log => log.EndedAt == null)
+            .Where(log => log.EndedAt == null);
+
+        if (!isAdmin)
+        {
+            var user = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.AzureId == userAzureId &&
+                    x.IsActive);
+
+            if (user == null)
+            {
+                return [];
+            }
+
+            query = query.Where(log => log.UserId == user.Id);
+        }
+
+        var activeWork = await query
             .OrderByDescending(log => log.StartedAt)
             .Select(log => new ActiveWorkDto
             {
                 Id = log.Id,
-
                 StartedAt = log.StartedAt,
-
                 Status = log.Status,
 
                 Task = _dbContext.Tasks
@@ -227,6 +245,7 @@ public class WorkLogService
 
         return activeWork;
     }
+
 
     public async Task<WorkLogSummaryDto?> GetSummaryAsync(
         string userAzureId,

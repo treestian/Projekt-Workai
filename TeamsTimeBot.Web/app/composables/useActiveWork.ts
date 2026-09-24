@@ -1,3 +1,5 @@
+import { getAccessToken } from '~/utils/auth'
+
 export interface ActiveWorkItem {
   id: number
   startedAt: string
@@ -23,10 +25,19 @@ export const useActiveWork = () => {
     error.value = null
 
     try {
+      const token = await getAccessToken()
+
       activeWork.value = await $fetch<ActiveWorkItem[]>(
-        'http://localhost:5294/api/worklogs/active'
+        'http://localhost:5294/api/worklogs/active',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       )
-    } catch {
+    } catch (err) {
+      console.error('Błąd pobierania aktywności:', err)
+
       error.value = 'Nie udało się pobrać aktywności zespołu.'
     } finally {
       loading.value = false

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Web;
 using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
@@ -23,7 +24,24 @@ public class WorkLogsController : ControllerBase
     [HttpGet("active")]
     public async Task<IActionResult> GetActiveWork()
     {
-        var activeWork = await _workLogService.GetActiveWorkAsync();
+        var userAzureId = User.GetObjectId();
+
+        if (string.IsNullOrWhiteSpace(userAzureId))
+        {
+            return Unauthorized();
+        }
+
+        var isAdmin = await _authorizationService.IsAdminAsync(
+            userAzureId);
+
+        if (!isAdmin)
+        {
+            return Forbid();
+        }
+
+        var activeWork = await _workLogService.GetActiveWorkAsync(
+            userAzureId,
+            true);
 
         return Ok(activeWork);
     }
@@ -45,8 +63,7 @@ public class WorkLogsController : ControllerBase
                 "Data początkowa nie może być późniejsza niż końcowa.");
         }
 
-        var requestingUserAzureId =
-            User.FindFirst("oid")?.Value;
+        var requestingUserAzureId = User.GetObjectId();
 
         if (string.IsNullOrWhiteSpace(requestingUserAzureId))
         {

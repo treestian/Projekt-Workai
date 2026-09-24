@@ -15,5 +15,13 @@ export default defineNuxtConfig({
     plugins: [
       tailwindcss()
     ]
+  },
+
+  runtimeConfig: {
+    public: {
+      azureClientId: '',
+      azureTenantId: '',
+      apiUrl: 'http://localhost:5294'
+    }
   }
 })

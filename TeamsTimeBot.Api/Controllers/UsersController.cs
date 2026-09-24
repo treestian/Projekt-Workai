@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeamsTimeBot.Api.Services;
+using Microsoft.Identity.Web;
 
 namespace TeamsTimeBot.Api.Controllers;
 
@@ -88,7 +89,7 @@ public class UsersController : ControllerBase
 
     private async Task<bool> IsCurrentUserAdminAsync()
     {
-        var userAzureId = User.FindFirst("oid")?.Value;
+        var userAzureId = User.GetObjectId();
 
         if (string.IsNullOrWhiteSpace(userAzureId))
         {

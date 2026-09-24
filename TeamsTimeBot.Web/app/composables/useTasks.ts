@@ -1,4 +1,5 @@
 import type { TaskItem } from '../types/tasks'
+import { getAccessToken } from '~/utils/auth'
 
 export const useTasks = () => {
   const tasks = ref<TaskItem[]>([])
@@ -10,10 +11,19 @@ export const useTasks = () => {
     error.value = null
 
     try {
+      const token = await getAccessToken()
+
       tasks.value = await $fetch<TaskItem[]>(
-        'http://localhost:5294/api/tasks'
+        'http://localhost:5294/api/tasks',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       )
-    } catch {
+    } catch (err) {
+      console.error('Błąd pobierania zadań:', err)
+
       error.value = 'Nie udało się pobrać zadań.'
     } finally {
       loading.value = false

@@ -1,5 +1,7 @@
 import type { WorkLogSummary } from '~/types/worklogs'
 
+import { getAccessToken } from '~/utils/auth'
+
 export const useWorkLogs = () => {
   const report = ref<WorkLogSummary | null>(null)
   const loading = ref(false)
@@ -14,9 +16,14 @@ export const useWorkLogs = () => {
     error.value = null
 
     try {
+      const token = await getAccessToken()
+
       const response = await $fetch<WorkLogSummary>(
         'http://localhost:5294/api/worklogs/summary',
         {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
           query: {
             userAzureId,
             startDate,
