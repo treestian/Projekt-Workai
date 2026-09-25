@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TeamsTimeBot.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+20023d761212e95f318759cb5f60b1b950f42ce0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d056212e6c3cfaefc5a063db08403678a57aa50c")]
 [assembly: System.Reflection.AssemblyProductAttribute("TeamsTimeBot.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TeamsTimeBot.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
