@@ -184,7 +184,8 @@ public class ActionExecutor
     {
         var resolution = await _taskResolver.ResolveAsync(
             response.TaskId,
-            response.TaskName);
+            response.TaskName,
+            includeCompleted: true);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -236,7 +237,8 @@ public class ActionExecutor
     {
         var resolution = await _taskResolver.ResolveAsync(
             response.TaskId,
-            response.TaskName);
+            response.TaskName,
+            includeCompleted: true);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
