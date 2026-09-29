@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import { getAccessToken, getAccount, logout } from '~/utils/auth'
 
 interface User {
@@ -12,6 +13,9 @@ interface User {
 
 const currentUser = ref<User | null>(null)
 const loadingUser = ref(true)
+
+const config = useRuntimeConfig()
+const apiUrl = config.public.apiUrl
 
 const userDisplayName = computed(() => {
   return currentUser.value?.displayName ||
@@ -47,7 +51,7 @@ const loadCurrentUser = async () => {
     const token = await getAccessToken()
 
     const users = await $fetch<User[]>(
-      'http://localhost:5294/api/users',
+      `${apiUrl}/api/users`,
       {
         headers: {
           Authorization: `Bearer ${token}`
@@ -57,6 +61,7 @@ const loadCurrentUser = async () => {
 
     currentUser.value =
       users.find(user => user.azureId === account.localAccountId) ?? null
+
   } catch (error) {
     console.error('Nie udało się pobrać danych użytkownika:', error)
   } finally {
@@ -75,7 +80,9 @@ const handleLogout = async () => {
 onMounted(() => {
   loadCurrentUser()
 })
+
 </script>
+
 
 <template>
 

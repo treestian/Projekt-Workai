@@ -7,4 +7,6 @@ public class SyncSettings
     public int UserSyncIntervalHours { get; set; } = 24;
 
     public DateTime UpdatedAt { get; set; }
+
+    public string? UsersDeltaLink { get; set; }
 }

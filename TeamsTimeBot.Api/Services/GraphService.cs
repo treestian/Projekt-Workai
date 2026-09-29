@@ -1,6 +1,7 @@
 using Azure.Identity;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Graph.Users.Delta;
 
 namespace TeamsTimeBot.Api.Services;
 
@@ -24,41 +25,83 @@ public class GraphService
             new[] { "https://graph.microsoft.com/.default" });
     }
 
-    public async Task<List<User>> GetAllUsersAsync()
+
+    public async Task<UserDeltaResult> GetUsersDeltaAsync(
+        string? deltaLink = null)
     {
-        var users = new List<User>();
+        var changedUsers = new List<User>();
+        var deletedUserIds = new List<string>();
 
-        var response = await _graphClient.Users.GetAsync(config =>
+        string? nextLink = deltaLink;
+        string? finalDeltaLink = null;
+
+        DeltaGetResponse? response;
+
+        if (string.IsNullOrWhiteSpace(deltaLink))
         {
-            config.QueryParameters.Select = new[]
-            {
-                "id",
-                "displayName",
-                "mail",
-                "userPrincipalName"
-            };
+            response = await _graphClient.Users.Delta
+                .GetAsDeltaGetResponseAsync(config =>
+                {
+                    config.QueryParameters.Select = new[]
+                    {
+                        "id",
+                        "displayName",
+                        "mail",
+                        "userPrincipalName"
+                    };
 
-            config.QueryParameters.Top = 999;
-        });
+                    config.QueryParameters.Top = 999;
+                });
+        }
+        else
+        {
+            response = await _graphClient.Users.Delta
+                .WithUrl(deltaLink)
+                .GetAsDeltaGetResponseAsync();
+        }
 
         while (response != null)
         {
             if (response.Value != null)
             {
-                users.AddRange(response.Value);
+                foreach (var user in response.Value)
+                {
+                    if (string.IsNullOrWhiteSpace(user.Id))
+                    {
+                        continue;
+                    }
+
+                    if (user.AdditionalData != null &&
+                        user.AdditionalData.ContainsKey("@removed"))
+                    {
+                        deletedUserIds.Add(user.Id);
+                    }
+                    else
+                    {
+                        changedUsers.Add(user);
+                    }
+                }
             }
 
-            if (string.IsNullOrEmpty(response.OdataNextLink))
+            if (!string.IsNullOrWhiteSpace(response.OdataNextLink))
             {
-                break;
+                nextLink = response.OdataNextLink;
+
+                response = await _graphClient.Users.Delta
+                    .WithUrl(response.OdataNextLink)
+                    .GetAsDeltaGetResponseAsync();
+
+                continue;
             }
 
-            response = await _graphClient.Users
-                .WithUrl(response.OdataNextLink)
-                .GetAsync();
+            finalDeltaLink = response.OdataDeltaLink;
+            break;
         }
 
-        return users;
+        return new UserDeltaResult(
+            changedUsers,
+            deletedUserIds,
+            finalDeltaLink);
     }
 
     public async Task<Microsoft.Graph.Models.ChatMessage?> GetChannelMessageAsync(
@@ -72,6 +115,7 @@ public class GraphService
             .Messages[messageId]
             .GetAsync();
     }
+
     public async Task<Subscription?> CreateChannelMessageSubscriptionAsync(
         string teamId,
         string channelId,
@@ -89,6 +133,7 @@ public class GraphService
 
         return await _graphClient.Subscriptions.PostAsync(subscription);
     }
+
     public async Task<List<Team>> GetTeamsAsync()
     {
         var response = await _graphClient.Teams.GetAsync(config =>
@@ -149,7 +194,6 @@ public class GraphService
         return response?.Value ?? new List<ChatMessage>();
     }
 
-
     public async Task<List<User>> GetUsersAsync(int limit = 20)
     {
         var response = await _graphClient.Users.GetAsync(config =>
@@ -167,7 +211,9 @@ public class GraphService
 
         return response?.Value ?? new List<User>();
     }
-
-
-
 }
+
+public record UserDeltaResult(
+    List<User> ChangedUsers,
+    List<string> DeletedUserIds,
+    string? DeltaLink);

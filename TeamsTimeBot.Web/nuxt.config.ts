@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
+
   compatibilityDate: '2025-07-15',
 
   devtools: {
@@ -8,7 +9,7 @@ export default defineNuxtConfig({
   },
 
   css: [
-    '/Users/sebastianborek/Desktop/Projekt Workai/TeamsTimeBot.Web/assets/css/main.css'
+    '~/assets/css/main.css'
   ],
 
   vite: {
@@ -19,9 +20,10 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      azureClientId: '',
-      azureTenantId: '',
-      apiUrl: 'http://localhost:5294'
+      azureClientId: process.env.NUXT_PUBLIC_AZURE_CLIENT_ID,
+      azureTenantId: process.env.NUXT_PUBLIC_AZURE_TENANT_ID,
+      apiUrl: process.env.NUXT_PUBLIC_API_URL
     }
   }
+
 })

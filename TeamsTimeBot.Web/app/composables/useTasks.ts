@@ -1,10 +1,14 @@
 import type { TaskItem } from '../types/tasks'
+
 import { getAccessToken } from '~/utils/auth'
 
 export const useTasks = () => {
   const tasks = ref<TaskItem[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  const config = useRuntimeConfig()
+  const apiUrl = config.public.apiUrl
 
   const fetchTasks = async () => {
     loading.value = true
@@ -14,7 +18,7 @@ export const useTasks = () => {
       const token = await getAccessToken()
 
       tasks.value = await $fetch<TaskItem[]>(
-        'http://localhost:5294/api/tasks',
+        `${apiUrl}/api/tasks`,
         {
           headers: {
             Authorization: `Bearer ${token}`

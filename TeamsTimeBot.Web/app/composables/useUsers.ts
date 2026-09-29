@@ -11,6 +11,9 @@ export const useUsers = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const config = useRuntimeConfig()
+  const apiUrl = config.public.apiUrl
+
   const fetchUsers = async () => {
     loading.value = true
     error.value = null
@@ -19,7 +22,7 @@ export const useUsers = () => {
       const token = await getAccessToken()
 
       users.value = await $fetch<User[]>(
-        'http://localhost:5294/api/users',
+        `${apiUrl}/api/users`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -43,7 +46,7 @@ export const useUsers = () => {
       const token = await getAccessToken()
 
       const result = await $fetch<UserSyncResult>(
-        'http://localhost:5294/api/users/sync',
+        `${apiUrl}/api/users/sync`,
         {
           method: 'POST',
           headers: {
@@ -70,7 +73,7 @@ export const useUsers = () => {
     const token = await getAccessToken()
 
     return await $fetch<UserSyncSettings>(
-      'http://localhost:5294/api/users/sync-settings',
+      `${apiUrl}/api/users/sync-settings`,
       {
         headers: {
           Authorization: `Bearer ${token}`
@@ -83,7 +86,7 @@ export const useUsers = () => {
     const token = await getAccessToken()
 
     return await $fetch<UserSyncSettings>(
-      'http://localhost:5294/api/users/sync-settings',
+      `${apiUrl}/api/users/sync-settings`,
       {
         method: 'PUT',
         headers: {

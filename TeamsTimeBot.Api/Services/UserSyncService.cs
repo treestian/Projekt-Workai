@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using TeamsTimeBot.Api.Data;
 using TeamsTimeBot.Api.Models;
 
@@ -8,6 +9,8 @@ public class UserSyncService
 {
     private readonly GraphService _graphService;
     private readonly AppDbContext _db;
+    private const string AdminAzureId =
+    "24940820-21cb-4c70-bb2c-9b088075bb35";
 
     public UserSyncService(
         GraphService graphService,
@@ -21,23 +24,40 @@ public class UserSyncService
     {
         var added = 0;
         var updated = 0;
-        var deactivated = 0;
+        var deactivated = 0; 
 
-        var graphUsers = await _graphService.GetAllUsersAsync();
+        var settings = await _db.SyncSettings
+            .OrderBy(x => x.Id)
+            .FirstOrDefaultAsync();
 
-        var activeAzureIds = new HashSet<string>();
+        if (settings == null)
+        {
+            settings = new SyncSettings
+            {
+                UserSyncIntervalHours = 24,
+                UpdatedAt = DateTime.UtcNow
+            };
 
-        var localUsers = await _db.Users.ToDictionaryAsync(
-            user => user.AzureId);
+            _db.SyncSettings.Add(settings);
 
-        foreach (var graphUser in graphUsers)
+            await _db.SaveChangesAsync();
+        }
+
+    
+        var deltaResult = await _graphService.GetUsersDeltaAsync(
+            settings.UsersDeltaLink);
+
+        var localUsers = await _db.Users
+            .ToDictionaryAsync(user => user.AzureId);
+
+        
+
+        foreach (var graphUser in deltaResult.ChangedUsers)
         {
             if (string.IsNullOrWhiteSpace(graphUser.Id))
             {
                 continue;
             }
-
-            activeAzureIds.Add(graphUser.Id);
 
             if (!localUsers.TryGetValue(
                     graphUser.Id,
@@ -50,11 +70,15 @@ public class UserSyncService
                     Email = graphUser.Mail,
                     UserPrincipalName = graphUser.UserPrincipalName,
                     IsActive = true,
+                    Role = graphUser.Id == AdminAzureId
+                        ? UserRole.Admin
+                        : UserRole.Employee,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
 
                 _db.Users.Add(newUser);
+
                 added++;
 
                 continue;
@@ -82,7 +106,12 @@ public class UserSyncService
 
                 hasChanges = true;
             }
-
+            if (existingUser.AzureId == AdminAzureId &&
+                existingUser.Role != UserRole.Admin)
+            {
+                existingUser.Role = UserRole.Admin;
+                hasChanges = true;
+            }
             if (!existingUser.IsActive)
             {
                 existingUser.IsActive = true;
@@ -96,21 +125,42 @@ public class UserSyncService
             }
         }
 
-        foreach (var localUser in localUsers.Values)
+        foreach (var deletedAzureId in deltaResult.DeletedUserIds)
         {
-            if (!activeAzureIds.Contains(localUser.AzureId)
-                && localUser.IsActive)
+            if (!localUsers.TryGetValue(
+                    deletedAzureId,
+                    out var existingUser))
             {
-                localUser.IsActive = false;
-                localUser.UpdatedAt = DateTime.UtcNow;
-                deactivated++;
+                continue;
             }
+
+            if (!existingUser.IsActive)
+            {
+                continue;
+            }
+
+            existingUser.IsActive = false;
+            existingUser.UpdatedAt = DateTime.UtcNow;
+
+            deactivated++;
         }
+
+        if (!string.IsNullOrWhiteSpace(deltaResult.DeltaLink))
+        {
+            settings.UsersDeltaLink = deltaResult.DeltaLink;
+        }
+
+        settings.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
+
+        var totalChanges =
+            deltaResult.ChangedUsers.Count +
+            deltaResult.DeletedUserIds.Count;
+
         return new SyncResult(
-            graphUsers.Count,
+            totalChanges,
             added,
             updated,
             deactivated);

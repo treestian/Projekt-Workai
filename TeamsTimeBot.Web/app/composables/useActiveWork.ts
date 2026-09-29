@@ -20,6 +20,9 @@ export const useActiveWork = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const config = useRuntimeConfig()
+  const apiUrl = config.public.apiUrl
+
   const fetchActiveWork = async () => {
     loading.value = true
     error.value = null
@@ -28,7 +31,7 @@ export const useActiveWork = () => {
       const token = await getAccessToken()
 
       activeWork.value = await $fetch<ActiveWorkItem[]>(
-        'http://localhost:5294/api/worklogs/active',
+        `${apiUrl}/api/worklogs/active`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -51,3 +54,4 @@ export const useActiveWork = () => {
     fetchActiveWork
   }
 }
+

@@ -191,7 +191,12 @@ onMounted(async () => {
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-slate-100">
-								<tr v-for="user in filteredUsers" :key="user.id" class="transition hover:bg-slate-50/70">
+								<tr
+                                    v-for="(user, index) in filteredUsers"
+                                    :key="user.id ?? `user-${index}`"
+                                    :class="`user-${index}`"
+                                    class="transition hover:bg-slate-50/70"
+                                >
 									<td class="px-5 py-4">
 										<div class="flex items-center gap-3">
 											<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">

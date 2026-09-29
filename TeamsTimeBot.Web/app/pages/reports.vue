@@ -5,6 +5,8 @@ const users = ref<any[]>([])
 const loadingUsers = ref(false)
 const usersError = ref<string | null>(null)
 const selectedUser = ref('')
+const config = useRuntimeConfig()
+const apiUrl = config.public.apiUrl
 
 const formatDateInput = (date: Date) => {
   const year = date.getFullYear()
@@ -39,7 +41,7 @@ const fetchUsers = async () => {
     const token = await getAccessToken()
 
     users.value = await $fetch<any[]>(
-      'http://localhost:5294/api/users',
+      `${apiUrl}/api/users`,
       {
         headers: {
           Authorization: `Bearer ${token}`

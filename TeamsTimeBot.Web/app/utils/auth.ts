@@ -9,7 +9,9 @@ let msalInstance: PublicClientApplication | null = null
 const API_SCOPE =
 'api://592f5759-2d96-4aa8-916e-04d2b3a0d655/access_as_user'
 
-const REDIRECT_URI = 'http://localhost:3000'
+const REDIRECT_URI = import.meta.client
+  ? window.location.origin
+  : 'http://localhost:3000'
 
 export const initializeMsal = async () => {
 if (msalInstance) {
@@ -52,11 +54,11 @@ const activeAccount = msalInstance.getActiveAccount()
 if (!activeAccount && accounts.length > 0) {
 const account = accounts[0]
 
-```
+
 if (account) {
   msalInstance.setActiveAccount(account)
 }
-```
+
 
 }
 

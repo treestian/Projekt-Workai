@@ -7,6 +7,9 @@ export const useWorkLogs = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const config = useRuntimeConfig()
+  const apiUrl = config.public.apiUrl
+
   const fetchSummary = async (
     userAzureId: string,
     startDate: string,
@@ -19,7 +22,7 @@ export const useWorkLogs = () => {
       const token = await getAccessToken()
 
       const response = await $fetch<WorkLogSummary>(
-        'http://localhost:5294/api/worklogs/summary',
+        `${apiUrl}/api/worklogs/summary`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -52,3 +55,4 @@ export const useWorkLogs = () => {
     fetchSummary
   }
 }
+
