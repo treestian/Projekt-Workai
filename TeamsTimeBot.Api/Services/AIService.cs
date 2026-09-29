@@ -217,7 +217,7 @@ public class AIService
 
                 - start_time rozpoczyna pomiar czasu.
                 - stop_time zatrzymuje aktywny pomiar czasu.
-                - manual_time dodaje ręcznie podany czas.
+                - manual_time dodaje ręcznie podany czas (czas pracy mozna zalgowac tylko sobie)
                 - finish_task oznacza zadanie jako zakończone.
 
                 =========================================================

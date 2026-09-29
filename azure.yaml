@@ -6,3 +6,10 @@ services:
     language: dotnet
     project: ./apphost.cs
     host: containerapp
+hooks:
+  postdeploy:
+    shell: sh
+    run: sh "./scripts/postdeploy-secrets.sh"
+    secrets:
+      AZURE_AD_CLIENT_SECRET_VALUE: AZURE_AD_CLIENT_SECRET
+      AZURE_SQL_CONNECTION_STRING_VALUE: AZURE_SQL_CONNECTION_STRING

@@ -36,7 +36,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<GraphService>();
 builder.Services.AddScoped<UserSyncService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(
+    options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddHostedService<UserSyncBackgroundService>();
 builder.Services.AddScoped<WorkLogService>();
