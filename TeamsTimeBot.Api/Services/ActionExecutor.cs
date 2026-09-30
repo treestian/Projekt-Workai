@@ -11,6 +11,7 @@ public class ActionExecutor
     private readonly CommentService _commentService;
     private readonly ReportService _reportService;
     private readonly AuthorizationService _authorizationService;
+    private readonly PendingMentions _pendingMentions;
 
     public ActionExecutor(
         TaskResolver taskResolver,
@@ -18,7 +19,8 @@ public class ActionExecutor
         TaskService taskService,
         CommentService commentService,
         ReportService reportService,
-        AuthorizationService authorizationService)
+        AuthorizationService authorizationService,
+        PendingMentions pendingMentions)
     {
         _taskResolver = taskResolver;
         _workLogService = workLogService;
@@ -26,6 +28,14 @@ public class ActionExecutor
         _commentService = commentService;
         _reportService = reportService;
         _authorizationService = authorizationService;
+        _pendingMentions = pendingMentions;
+    }
+
+    private async Task<string> GetActorNameAsync(string userAzureId)
+    {
+        var actor = await _authorizationService.GetUserAsync(userAzureId);
+
+        return actor?.DisplayName ?? "Ktoś";
     }
 
     public async Task<ActionExecutionResult> StartTimeAsync(
@@ -153,15 +163,33 @@ public class ActionExecutor
                 resolution.Task.Name);
         }
 
-        var stoppedWorkLogs =
+        var stoppedWorkers =
             await _workLogService.StopAllActiveForTaskAsync(
                 resolution.Task.Id);
+
+        var affected = stoppedWorkers
+            .Where(x => x.AzureId != userAzureId)
+            .ToList();
+
+        if (affected.Count > 0)
+        {
+            var actorName = await GetActorNameAsync(userAzureId);
+
+            foreach (var worker in affected)
+            {
+                _pendingMentions.Add(
+                    worker.AzureId,
+                    worker.DisplayName,
+                    $"{actorName} zakończył(a) zadanie „{resolution.Task.Name}”, "
+                    + "więc zatrzymałem Twój pomiar czasu.");
+            }
+        }
 
         var success = ActionExecutionResult.Success(
             resolution.Task.Id,
             resolution.Task.Name);
 
-        success.StoppedWorkLogs = stoppedWorkLogs;
+        success.StoppedWorkLogs = stoppedWorkers.Count;
 
         return success;
     }
@@ -299,6 +327,28 @@ public class ActionExecutor
         if (comment == null)
         {
             return ActionExecutionResult.Error();
+        }
+
+        var workers = await _workLogService.GetActiveWorkersAsync(
+            resolution.Task.Id);
+
+        var affected = workers
+            .Where(x => x.AzureId != userAzureId)
+            .ToList();
+
+        if (affected.Count > 0)
+        {
+            var actorName = await GetActorNameAsync(userAzureId);
+
+            foreach (var worker in affected)
+            {
+                _pendingMentions.Add(
+                    worker.AzureId,
+                    worker.DisplayName,
+                    $"{actorName} dodał(a) komentarz do zadania "
+                    + $"„{resolution.Task.Name}”, nad którym pracujesz: "
+                    + $"„{response.Comment.Trim()}”");
+            }
         }
 
         return ActionExecutionResult.Success(

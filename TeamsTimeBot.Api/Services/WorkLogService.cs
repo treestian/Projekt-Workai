@@ -134,7 +134,7 @@ public class WorkLogService
         return activeWorkLog;
     }
 
-    public async Task<int> StopAllActiveForTaskAsync(int taskId)
+    public async Task<List<TaskWorker>> StopAllActiveForTaskAsync(int taskId)
     {
         var activeWorkLogs = await _dbContext.WorkLogs
             .Where(x =>
@@ -144,7 +144,7 @@ public class WorkLogService
 
         if (activeWorkLogs.Count == 0)
         {
-            return 0;
+            return [];
         }
 
         var now = DateTime.UtcNow;
@@ -162,7 +162,42 @@ public class WorkLogService
             activeWorkLogs.Count,
             taskId);
 
-        return activeWorkLogs.Count;
+        var userIds = activeWorkLogs
+            .Select(x => x.UserId)
+            .Distinct()
+            .ToList();
+
+        return await GetWorkersAsync(userIds);
+    }
+
+    public async Task<List<TaskWorker>> GetActiveWorkersAsync(int taskId)
+    {
+        var userIds = await _dbContext.WorkLogs
+            .AsNoTracking()
+            .Where(x =>
+                x.TaskId == taskId &&
+                x.EndedAt == null)
+            .Select(x => x.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        return await GetWorkersAsync(userIds);
+    }
+
+    private async Task<List<TaskWorker>> GetWorkersAsync(List<int> userIds)
+    {
+        if (userIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.Id))
+            .Select(x => new TaskWorker(
+                x.AzureId,
+                x.DisplayName))
+            .ToListAsync();
     }
 
     public async Task<WorkLog?> AddManualTimeAsync(
@@ -359,6 +394,10 @@ public class WorkLogService
         };
     }
 }
+
+public sealed record TaskWorker(
+    string AzureId,
+    string? DisplayName);
 
 public sealed record StartWorkResult(
     WorkLog WorkLog,

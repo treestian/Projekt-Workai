@@ -47,6 +47,8 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<BotEngine>();
 builder.Services.AddScoped<ConversationService>();
 builder.Services.AddScoped<TaskResolver>();
+builder.Services.AddScoped<PendingMentions>();
+builder.Services.AddScoped<PendingChoice>();
 builder.Services.AddScoped<ActionExecutor>();
 builder.Services.AddScoped<AuthorizationService>();
 builder.Services.AddScoped<ReportService>();
