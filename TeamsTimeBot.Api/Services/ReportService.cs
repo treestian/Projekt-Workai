@@ -105,8 +105,8 @@ public class ReportService
                 .OrderBy(x => x.DisplayName)
                 .ToListAsync();
 
-        var start = startDate.Date;
-        var end = endDate.Date.AddDays(1);
+        var start = PolandTime.ToUtc(startDate.Date);
+        var end = PolandTime.ToUtc(endDate.Date.AddDays(1));
 
         var userIds =
             users
@@ -194,10 +194,10 @@ public class ReportService
         }
 
         var start =
-            startDate.Date;
+            PolandTime.ToUtc(startDate.Date);
 
         var end =
-            endDate.Date.AddDays(1);
+            PolandTime.ToUtc(endDate.Date.AddDays(1));
 
         var query =
             _dbContext.WorkLogs
@@ -286,10 +286,10 @@ public class ReportService
         DateTime endDate)
     {
         var start =
-            startDate.Date;
+            PolandTime.ToUtc(startDate.Date);
 
         var end =
-            endDate.Date.AddDays(1);
+            PolandTime.ToUtc(endDate.Date.AddDays(1));
 
         var logs =
             await _dbContext.WorkLogs

@@ -38,6 +38,31 @@ public class ActionExecutor
         return actor?.DisplayName ?? "Ktoś";
     }
 
+    private async Task NotifyWorkersAsync(
+        IEnumerable<TaskWorker> workers,
+        string actorUserAzureId,
+        Func<string, string> buildMessage)
+    {
+        var affected = workers
+            .Where(x => x.AzureId != actorUserAzureId)
+            .ToList();
+
+        if (affected.Count == 0)
+        {
+            return;
+        }
+
+        var actorName = await GetActorNameAsync(actorUserAzureId);
+
+        foreach (var worker in affected)
+        {
+            _pendingMentions.Add(
+                worker.AzureId,
+                worker.DisplayName,
+                buildMessage(actorName));
+        }
+    }
+
     public async Task<ActionExecutionResult> StartTimeAsync(
         string userAzureId,
         LLMResponse response)
@@ -167,23 +192,12 @@ public class ActionExecutor
             await _workLogService.StopAllActiveForTaskAsync(
                 resolution.Task.Id);
 
-        var affected = stoppedWorkers
-            .Where(x => x.AzureId != userAzureId)
-            .ToList();
-
-        if (affected.Count > 0)
-        {
-            var actorName = await GetActorNameAsync(userAzureId);
-
-            foreach (var worker in affected)
-            {
-                _pendingMentions.Add(
-                    worker.AzureId,
-                    worker.DisplayName,
-                    $"{actorName} zakończył(a) zadanie „{resolution.Task.Name}”, "
-                    + "więc zatrzymałem Twój pomiar czasu.");
-            }
-        }
+        await NotifyWorkersAsync(
+            stoppedWorkers,
+            userAzureId,
+            actorName =>
+                $"{actorName} zakończył(a) zadanie „{resolution.Task.Name}”, "
+                + "więc zatrzymałem Twój pomiar czasu.");
 
         var success = ActionExecutionResult.Success(
             resolution.Task.Id,
@@ -282,6 +296,17 @@ public class ActionExecutor
             {
                 return ActionExecutionResult.Error();
             }
+
+            var workers = await _workLogService.GetActiveWorkersAsync(
+                resolution.Task.Id);
+
+            await NotifyWorkersAsync(
+                workers,
+                userAzureId,
+                actorName =>
+                    $"{actorName} dodał(a) komentarz do zadania "
+                    + $"„{resolution.Task.Name}”, nad którym pracujesz: "
+                    + $"„{response.Comment.Trim()}”");
         }
 
         return ActionExecutionResult.Success(
@@ -332,24 +357,13 @@ public class ActionExecutor
         var workers = await _workLogService.GetActiveWorkersAsync(
             resolution.Task.Id);
 
-        var affected = workers
-            .Where(x => x.AzureId != userAzureId)
-            .ToList();
-
-        if (affected.Count > 0)
-        {
-            var actorName = await GetActorNameAsync(userAzureId);
-
-            foreach (var worker in affected)
-            {
-                _pendingMentions.Add(
-                    worker.AzureId,
-                    worker.DisplayName,
-                    $"{actorName} dodał(a) komentarz do zadania "
-                    + $"„{resolution.Task.Name}”, nad którym pracujesz: "
-                    + $"„{response.Comment.Trim()}”");
-            }
-        }
+        await NotifyWorkersAsync(
+            workers,
+            userAzureId,
+            actorName =>
+                $"{actorName} dodał(a) komentarz do zadania "
+                + $"„{resolution.Task.Name}”, nad którym pracujesz: "
+                + $"„{response.Comment.Trim()}”");
 
         return ActionExecutionResult.Success(
             resolution.Task.Id,

@@ -136,38 +136,40 @@ public class WorkLogService
 
     public async Task<List<TaskWorker>> StopAllActiveForTaskAsync(int taskId)
     {
-        var activeWorkLogs = await _dbContext.WorkLogs
-            .Where(x =>
-                x.TaskId == taskId &&
-                x.EndedAt == null)
+        var workers = await (
+            from log in _dbContext.WorkLogs
+            join user in _dbContext.Users
+                on log.UserId equals user.Id
+            where
+                log.TaskId == taskId &&
+                log.EndedAt == null
+            select new TaskWorker(
+                user.AzureId,
+                user.DisplayName))
+            .Distinct()
             .ToListAsync();
 
-        if (activeWorkLogs.Count == 0)
+        if (workers.Count == 0)
         {
             return [];
         }
 
         var now = DateTime.UtcNow;
 
-        foreach (var workLog in activeWorkLogs)
-        {
-            workLog.EndedAt = now;
-            workLog.Status = "Zakonczone";
-        }
-
-        await _dbContext.SaveChangesAsync();
+        var affected = await _dbContext.WorkLogs
+            .Where(x =>
+                x.TaskId == taskId &&
+                x.EndedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.EndedAt, now)
+                .SetProperty(x => x.Status, "Zakonczone"));
 
         _logger.LogInformation(
             "Stopped {Count} active work logs after finishing task {TaskId}.",
-            activeWorkLogs.Count,
+            affected,
             taskId);
 
-        var userIds = activeWorkLogs
-            .Select(x => x.UserId)
-            .Distinct()
-            .ToList();
-
-        return await GetWorkersAsync(userIds);
+        return workers;
     }
 
     public async Task<List<TaskWorker>> GetActiveWorkersAsync(int taskId)
@@ -302,13 +304,6 @@ public class WorkLogService
             })
             .ToListAsync();
 
-        foreach (var workLog in activeWork)
-        {
-            workLog.StartedAt = DateTime.SpecifyKind(
-                workLog.StartedAt,
-                DateTimeKind.Utc);
-        }
-
         return activeWork;
     }
 
@@ -326,8 +321,8 @@ public class WorkLogService
             return null;
         }
 
-        var start = startDate.Date;
-        var end = endDate.Date.AddDays(1);
+        var start = PolandTime.ToUtc(startDate.Date);
+        var end = PolandTime.ToUtc(endDate.Date.AddDays(1));
 
         var logs = await _dbContext.WorkLogs
             .Where(x =>

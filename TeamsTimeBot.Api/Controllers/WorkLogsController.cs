@@ -38,7 +38,7 @@ public class WorkLogsController : ControllerBase
 
         var activeWork = await _workLogService.GetActiveWorkAsync(
             userAzureId,
-            true);
+            isAdmin);
 
         return Ok(activeWork);
     }

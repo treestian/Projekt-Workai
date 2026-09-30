@@ -10,6 +10,12 @@ public class PendingChoice
 
     public bool HasChoice => Options.Count > 0;
 
+    public void Clear()
+    {
+        Question = null;
+        Options.Clear();
+    }
+
     public void Set(
         string? question,
         IEnumerable<string?> options)

@@ -701,6 +701,8 @@ public class AIService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            _pendingChoice.Clear();
+
             var options =
                 new CreateResponseOptions
                 {
@@ -785,6 +787,10 @@ public class AIService
                 }
             }
 
+            var notShownMessage = toolCalls.Count > 0
+                ? "Najpierw wykonaj operację, potem zadaj pytanie."
+                : "Pytanie wymaga treści oraz od 2 do 6 opcji odpowiedzi.";
+
             foreach (var choiceCall in choiceCalls)
             {
                 inputItems.Add(
@@ -794,9 +800,7 @@ public class AIService
                             new
                             {
                                 status = "NOT_SHOWN",
-                                message =
-                                    "Najpierw wykonaj operacje, "
-                                    + "potem zadaj pytanie."
+                                message = notShownMessage
                             })));
             }
 

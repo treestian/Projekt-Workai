@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TeamsTimeBot.Api.Models;
 
 namespace TeamsTimeBot.Api.Data;
@@ -17,6 +18,18 @@ public class AppDbContext : DbContext
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<TaskComment> TaskComments { get; set; }
     public DbSet<PendingConversation> PendingConversations { get; set; }
+
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder
+            .Properties<DateTime>()
+            .HaveConversion<UtcDateTimeConverter>();
+
+        configurationBuilder
+            .Properties<DateTime?>()
+            .HaveConversion<NullableUtcDateTimeConverter>();
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,5 +90,27 @@ public class AppDbContext : DbContext
                                 Role = message.Role,
                                 Content = message.Content
                             }).ToList()));
+    }
+}
+
+public class UtcDateTimeConverter : ValueConverter<DateTime, DateTime>
+{
+    public UtcDateTimeConverter()
+        : base(
+            v => v,
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    {
+    }
+}
+
+public class NullableUtcDateTimeConverter : ValueConverter<DateTime?, DateTime?>
+{
+    public NullableUtcDateTimeConverter()
+        : base(
+            v => v,
+            v => v.HasValue
+                ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc)
+                : v)
+    {
     }
 }

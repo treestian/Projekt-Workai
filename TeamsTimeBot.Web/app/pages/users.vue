@@ -198,7 +198,6 @@ onMounted(async () => {
 								<tr
                                     v-for="(user, index) in filteredUsers"
                                     :key="user.id ?? `user-${index}`"
-                                    :class="`user-${index}`"
                                     class="transition hover:bg-slate-50/70"
                                 >
 									<td class="px-5 py-4">
