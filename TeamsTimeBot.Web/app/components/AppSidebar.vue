@@ -1,25 +1,17 @@
 <script setup lang="ts">
 
-import { getAccessToken, getAccount, logout } from '~/utils/auth'
+import { logout } from '~/utils/auth'
 
-interface User {
-  id: number
-  azureId: string
-  displayName?: string | null
-  mail?: string | null
-  userPrincipalName?: string | null
-  role?: number | string | null
-}
-
-const currentUser = ref<User | null>(null)
-const loadingUser = ref(true)
-
-const config = useRuntimeConfig()
-const apiUrl = config.public.apiUrl
+const {
+  currentUser,
+  loading: loadingUser,
+  isAdmin,
+  fetchCurrentUser
+} = useCurrentUser()
 
 const userDisplayName = computed(() => {
   return currentUser.value?.displayName ||
-    currentUser.value?.mail ||
+    currentUser.value?.email ||
     currentUser.value?.userPrincipalName ||
     'Użytkownik'
 })
@@ -29,45 +21,8 @@ const userInitial = computed(() => {
 })
 
 const userRole = computed(() => {
-  const role = currentUser.value?.role
-
-  if (role === 1 || String(role).toLowerCase() === 'admin') {
-    return 'Administrator'
-  }
-
-  return 'Pracownik'
+  return isAdmin.value ? 'Administrator' : 'Pracownik'
 })
-
-const loadCurrentUser = async () => {
-  loadingUser.value = true
-
-  try {
-    const account = getAccount()
-
-    if (!account) {
-      return
-    }
-
-    const token = await getAccessToken()
-
-    const users = await $fetch<User[]>(
-      `${apiUrl}/api/users`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    )
-
-    currentUser.value =
-      users.find(user => user.azureId === account.localAccountId) ?? null
-
-  } catch (error) {
-    console.error('Nie udało się pobrać danych użytkownika:', error)
-  } finally {
-    loadingUser.value = false
-  }
-}
 
 const handleLogout = async () => {
   try {
@@ -78,7 +33,7 @@ const handleLogout = async () => {
 }
 
 onMounted(() => {
-  loadCurrentUser()
+  fetchCurrentUser()
 })
 
 </script>
@@ -177,6 +132,7 @@ onMounted(() => {
         </NuxtLink>
 
         <NuxtLink
+          v-if="isAdmin"
           to="/users"
           class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
           active-class="bg-slate-100 text-slate-900"

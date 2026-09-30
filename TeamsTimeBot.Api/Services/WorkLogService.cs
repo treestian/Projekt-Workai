@@ -134,6 +134,37 @@ public class WorkLogService
         return activeWorkLog;
     }
 
+    public async Task<int> StopAllActiveForTaskAsync(int taskId)
+    {
+        var activeWorkLogs = await _dbContext.WorkLogs
+            .Where(x =>
+                x.TaskId == taskId &&
+                x.EndedAt == null)
+            .ToListAsync();
+
+        if (activeWorkLogs.Count == 0)
+        {
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+
+        foreach (var workLog in activeWorkLogs)
+        {
+            workLog.EndedAt = now;
+            workLog.Status = "Zakonczone";
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Stopped {Count} active work logs after finishing task {TaskId}.",
+            activeWorkLogs.Count,
+            taskId);
+
+        return activeWorkLogs.Count;
+    }
+
     public async Task<WorkLog?> AddManualTimeAsync(
         string userAzureId,
         int taskId,
@@ -148,14 +179,14 @@ public class WorkLogService
             return null;
         }
 
-        if (manualMinutes <= 0)
+        if (manualMinutes is <= 0 or > 24 * 60)
         {
             return null;
         }
 
-        var date = (workDate ?? DateTime.UtcNow).Date;
+        var date = (workDate ?? PolandTime.Now).Date;
 
-        var startedAt = date;
+        var startedAt = PolandTime.ToUtc(date);
         var endedAt = startedAt.AddMinutes(manualMinutes);
 
         var workLog = new WorkLog
@@ -260,13 +291,17 @@ public class WorkLogService
             return null;
         }
 
+        var start = startDate.Date;
+        var end = endDate.Date.AddDays(1);
+
         var logs = await _dbContext.WorkLogs
             .Where(x =>
                 x.UserId == user.Id &&
                 x.EndedAt.HasValue &&
-                x.StartedAt >= startDate &&
-                x.StartedAt <= endDate)
+                x.StartedAt >= start &&
+                x.StartedAt < end)
             .ToListAsync();
+
 
         var taskIds = logs
             .Select(x => x.TaskId)

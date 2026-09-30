@@ -1,1 +1,18 @@
+# Azure Developer CLI
 .azure
+
+# Node
+node_modules/
+
+# .NET
+bin/
+obj/
+
+# Lokalne bazy danych
+*.db
+*.db-shm
+*.db-wal
+
+# Logi i śmieci systemowe
+*.log
+.DS_Store

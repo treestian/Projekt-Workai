@@ -104,36 +104,6 @@ public class GraphService
             finalDeltaLink);
     }
 
-    public async Task<Microsoft.Graph.Models.ChatMessage?> GetChannelMessageAsync(
-        string teamId,
-        string channelId,
-        string messageId)
-    {
-        return await _graphClient
-            .Teams[teamId]
-            .Channels[channelId]
-            .Messages[messageId]
-            .GetAsync();
-    }
-
-    public async Task<Subscription?> CreateChannelMessageSubscriptionAsync(
-        string teamId,
-        string channelId,
-        string notificationUrl,
-        string clientState)
-    {
-        var subscription = new Subscription
-        {
-            ChangeType = "created",
-            NotificationUrl = notificationUrl,
-            Resource = $"/teams/{teamId}/channels/{channelId}/messages",
-            ExpirationDateTime = DateTimeOffset.UtcNow.AddMinutes(50),
-            ClientState = clientState
-        };
-
-        return await _graphClient.Subscriptions.PostAsync(subscription);
-    }
-
     public async Task<List<Team>> GetTeamsAsync()
     {
         var response = await _graphClient.Teams.GetAsync(config =>
@@ -194,23 +164,6 @@ public class GraphService
         return response?.Value ?? new List<ChatMessage>();
     }
 
-    public async Task<List<User>> GetUsersAsync(int limit = 20)
-    {
-        var response = await _graphClient.Users.GetAsync(config =>
-        {
-            config.QueryParameters.Select = new[]
-            {
-                "id",
-                "displayName",
-                "mail",
-                "userPrincipalName"
-            };
-
-            config.QueryParameters.Top = limit;
-        });
-
-        return response?.Value ?? new List<User>();
-    }
 }
 
 public record UserDeltaResult(

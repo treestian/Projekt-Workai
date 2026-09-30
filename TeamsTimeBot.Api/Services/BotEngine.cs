@@ -4,6 +4,8 @@ namespace TeamsTimeBot.Api.Services;
 
 public class BotEngine
 {
+    private const int MaxHistoryMessages = 20;
+
     private readonly AIService _aiService;
     private readonly ConversationService _conversationService;
 
@@ -17,14 +19,13 @@ public class BotEngine
 
     public async Task<string?> HandleAsync(
         string userAzureId,
-        string message)
+        string message,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(userAzureId))
         {
             return "Nie udało się rozpoznać użytkownika.";
         }
-        Console.WriteLine(
-            $"BOT USER AZURE ID: {userAzureId}");
 
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -41,6 +42,8 @@ public class BotEngine
                 Content = message.Trim()
             });
 
+        TrimHistory(conversation.Messages);
+
         // =========================================================
         // AI obsługuje całą logikę:
         //
@@ -50,7 +53,8 @@ public class BotEngine
         var response =
             await _aiService.GetResponseAsync(
                 conversation.Messages,
-                userAzureId);
+                userAzureId,
+                cancellationToken);
 
         // =========================================================
         // Zapisz odpowiedź AI do historii
@@ -64,10 +68,23 @@ public class BotEngine
                     Role = "assistant",
                     Content = response
                 });
+
+            TrimHistory(conversation.Messages);
         }
 
         await _conversationService.SaveAsync(conversation);
 
         return response;
+    }
+
+    private static void TrimHistory(
+        List<ConversationMessage> messages)
+    {
+        var excess = messages.Count - MaxHistoryMessages;
+
+        if (excess > 0)
+        {
+            messages.RemoveRange(0, excess);
+        }
     }
 }

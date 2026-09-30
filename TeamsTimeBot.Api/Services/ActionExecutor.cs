@@ -79,7 +79,8 @@ public class ActionExecutor
     {
         var resolution = await _taskResolver.ResolveAsync(
             response.TaskId,
-            response.TaskName);
+            response.TaskName,
+            includeCompleted: true);
 
         if (resolution.Status == TaskResolutionStatus.NotFound)
         {
@@ -137,21 +138,32 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        var task = await _taskService.FinishTaskAsync(
+        var result = await _taskService.FinishTaskAsync(
             resolution.Task.Id);
 
-        if (task == null)
+        if (result.Status == TaskFinishStatus.NotFound)
         {
-            return ActionExecutionResult.Error();
+            return ActionExecutionResult.NotFound();
         }
 
-        await _workLogService.StopWorkAsync(
-            userAzureId,
-            resolution.Task.Id);
+        if (result.Status == TaskFinishStatus.AlreadyCompleted)
+        {
+            return ActionExecutionResult.AlreadyCompleted(
+                resolution.Task.Id,
+                resolution.Task.Name);
+        }
 
-        return ActionExecutionResult.Success(
+        var stoppedWorkLogs =
+            await _workLogService.StopAllActiveForTaskAsync(
+                resolution.Task.Id);
+
+        var success = ActionExecutionResult.Success(
             resolution.Task.Id,
             resolution.Task.Name);
+
+        success.StoppedWorkLogs = stoppedWorkLogs;
+
+        return success;
     }
 
     public async Task<ActionExecutionResult> CreateTaskAsync(
@@ -163,19 +175,28 @@ public class ActionExecutor
             return ActionExecutionResult.MissingTaskName();
         }
 
-        var task = await _taskService.CreateTaskAsync(
+        var result = await _taskService.CreateTaskAsync(
             userAzureId,
             response.NewTaskName,
             response.Description);
 
-        if (task == null)
+        return result.Status switch
         {
-            return ActionExecutionResult.Error();
-        }
+            TaskCreateStatus.Created =>
+                ActionExecutionResult.Success(
+                    result.Task!.Id,
+                    result.Task.Name),
 
-        return ActionExecutionResult.Success(
-            task.Id,
-            task.Name);
+            TaskCreateStatus.DuplicateName =>
+                ActionExecutionResult.DuplicateTaskName(
+                    result.Task!.Id,
+                    result.Task.Name),
+
+            TaskCreateStatus.InvalidName =>
+                ActionExecutionResult.MissingTaskName(),
+
+            _ => ActionExecutionResult.Error()
+        };
     }
 
     public async Task<ActionExecutionResult> EditTaskAsync(
@@ -203,15 +224,24 @@ public class ActionExecutor
             return ActionExecutionResult.Error();
         }
 
-        var task = await _taskService.EditTaskAsync(
+        var result = await _taskService.EditTaskAsync(
             resolution.Task.Id,
             response.NewTaskName,
             response.Description);
 
-        if (task == null)
+        if (result.Status == TaskEditStatus.NotFound)
         {
-            return ActionExecutionResult.Error();
+            return ActionExecutionResult.NotFound();
         }
+
+        if (result.Status == TaskEditStatus.DuplicateName)
+        {
+            return ActionExecutionResult.DuplicateTaskName(
+                resolution.Task.Id,
+                resolution.Task.Name);
+        }
+
+        var task = result.Task!;
 
         if (!string.IsNullOrWhiteSpace(response.Comment))
         {
@@ -420,6 +450,64 @@ public class ActionExecutor
         }
     }
 
+    public async Task<TaskWorkReportResult> GetTaskWorkReportAsync(
+        string requestingUserAzureId,
+        int? taskId,
+        string? taskName,
+        DateTime startDate,
+        DateTime endDate)
+    {
+        var resolution = await _taskResolver.ResolveAsync(
+            taskId,
+            taskName,
+            includeCompleted: true);
+
+        if (resolution.Status == TaskResolutionStatus.NotFound)
+        {
+            return new TaskWorkReportResult
+            {
+                StatusCode = 404
+            };
+        }
+
+        if (resolution.Status == TaskResolutionStatus.Ambiguous)
+        {
+            return new TaskWorkReportResult
+            {
+                StatusCode = 409,
+                Candidates = resolution.GetCandidateDtos()
+            };
+        }
+
+        if (resolution.Task == null)
+        {
+            return new TaskWorkReportResult
+            {
+                StatusCode = 500
+            };
+        }
+
+        var report = await _reportService.GetTaskReportAsync(
+            requestingUserAzureId,
+            resolution.Task.Id,
+            startDate,
+            endDate);
+
+        if (report == null)
+        {
+            return new TaskWorkReportResult
+            {
+                StatusCode = 404
+            };
+        }
+
+        return new TaskWorkReportResult
+        {
+            StatusCode = 200,
+            Report = report
+        };
+    }
+
     public async Task<FindUserResult> FindUserAsync(
         string requestingUserAzureId,
         string search)
@@ -469,6 +557,8 @@ public class ActionExecutionResult
     public int? TaskId { get; set; }
 
     public string? TaskName { get; set; }
+
+    public int StoppedWorkLogs { get; set; }
 
     public List<TaskCandidateDto> Candidates { get; set; } = [];
 
@@ -554,6 +644,32 @@ public class ActionExecutionResult
         };
     }
 
+    public static ActionExecutionResult DuplicateTaskName(
+        int taskId,
+        string taskName)
+    {
+        return new ActionExecutionResult
+        {
+            StatusCode = 409,
+            Result = "DUPLICATE_TASK_NAME",
+            TaskId = taskId,
+            TaskName = taskName
+        };
+    }
+
+    public static ActionExecutionResult AlreadyCompleted(
+        int taskId,
+        string taskName)
+    {
+        return new ActionExecutionResult
+        {
+            StatusCode = 409,
+            Result = "ALREADY_COMPLETED",
+            TaskId = taskId,
+            TaskName = taskName
+        };
+    }
+
     public static ActionExecutionResult AlreadyActive(
         int taskId,
         string taskName)
@@ -572,6 +688,15 @@ public class WorkReportResult
 {
     public int StatusCode { get; set; }
 
+     public string Status => StatusCode switch
+    {
+        200 => "SUCCESS",
+        403 => "FORBIDDEN",
+        404 => "NOT_FOUND",
+        _   => "ERROR"
+    };
+
+
     public WorkReport? Report { get; set; }
 }
 
@@ -579,12 +704,46 @@ public class TeamWorkReportResult
 {
     public int StatusCode { get; set; }
 
+    public string Status => StatusCode switch
+    {
+        200 => "SUCCESS",
+        403 => "FORBIDDEN",
+        404 => "NOT_FOUND",
+        _   => "ERROR"
+    };
+
     public TeamWorkReport? Report { get; set; }
+}
+
+public class TaskWorkReportResult
+{
+    public int StatusCode { get; set; }
+
+    public string Status => StatusCode switch
+    {
+        200 => "SUCCESS",
+        403 => "FORBIDDEN",
+        404 => "NOT_FOUND",
+        409 => "AMBIGUOUS",
+        _   => "ERROR"
+    };
+
+    public TaskWorkReport? Report { get; set; }
+
+    public List<TaskCandidateDto> Candidates { get; set; } = [];
 }
 
 public class FindUserResult
 {
     public int StatusCode { get; set; }
+     public string Status => StatusCode switch
+    {
+        200 => "SUCCESS",
+        403 => "FORBIDDEN",
+        404 => "NOT_FOUND",
+        _   => "ERROR"
+    };
+
 
     public List<UserSearchResult> Users { get; set; } = [];
 }

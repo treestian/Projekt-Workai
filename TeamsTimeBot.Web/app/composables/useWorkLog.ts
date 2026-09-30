@@ -35,8 +35,6 @@ export const useWorkLogs = () => {
         }
       )
 
-      console.log('RAPORT Z API:', response)
-
       report.value = response
     } catch (err) {
       console.error('BŁĄD RAPORTU:', err)

@@ -29,8 +29,7 @@ public class TeamsBot : ActivityHandler
             ?? string.Empty;
 
         var senderId =
-            activity.From?.AadObjectId
-            ?? activity.From?.Id;
+            activity.From?.AadObjectId;
 
         _logger.LogInformation(
             "Received Teams activity. SenderId: {SenderId}, Text: {Text}",
@@ -58,7 +57,8 @@ public class TeamsBot : ActivityHandler
         var response =
             await _botEngine.HandleAsync(
                 senderId ?? string.Empty,
-                messageText);
+                messageText,
+                cancellationToken);
 
         // =========================================================
         // Nie wysyłamy pustej odpowiedzi

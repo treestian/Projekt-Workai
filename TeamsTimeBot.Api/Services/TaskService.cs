@@ -14,7 +14,7 @@ public class TaskService
         _dbContext = dbContext;
     }
 
-  public async Task<TaskItem?> CreateTaskAsync(
+    public async Task<TaskCreateResult> CreateTaskAsync(
         string userAzureId,
         string name,
         string? description = null)
@@ -24,12 +24,16 @@ public class TaskService
 
         if (user == null)
         {
-            return null;
+            return new TaskCreateResult(
+                TaskCreateStatus.UserNotFound,
+                null);
         }
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            return null;
+            return new TaskCreateResult(
+                TaskCreateStatus.InvalidName,
+                null);
         }
 
         var normalizedName = name.Trim().ToLower();
@@ -40,7 +44,9 @@ public class TaskService
 
         if (existingTask != null)
         {
-            return null;
+            return new TaskCreateResult(
+                TaskCreateStatus.DuplicateName,
+                existingTask);
         }
 
         var now = DateTime.UtcNow;
@@ -59,7 +65,9 @@ public class TaskService
 
         await _dbContext.SaveChangesAsync();
 
-        return task;
+        return new TaskCreateResult(
+            TaskCreateStatus.Created,
+            task);
     }
 
        
@@ -110,25 +118,23 @@ public class TaskService
 
 
 
-    public async Task<TaskItem?> GetByIdAsync(int taskId)
-    {
-        return await _dbContext.Tasks
-            .FirstOrDefaultAsync(x => x.Id == taskId);
-    }
-
-    public async Task<TaskItem?> FinishTaskAsync(int taskId)
+    public async Task<TaskFinishResult> FinishTaskAsync(int taskId)
     {
         var task = await _dbContext.Tasks
             .FirstOrDefaultAsync(x => x.Id == taskId);
 
         if (task == null)
         {
-            return null;
+            return new TaskFinishResult(
+                TaskFinishStatus.NotFound,
+                null);
         }
 
         if (task.IsCompleted)
         {
-            return null;
+            return new TaskFinishResult(
+                TaskFinishStatus.AlreadyCompleted,
+                task);
         }
 
         task.IsCompleted = true;
@@ -136,10 +142,12 @@ public class TaskService
 
         await _dbContext.SaveChangesAsync();
 
-        return task;
+        return new TaskFinishResult(
+            TaskFinishStatus.Finished,
+            task);
     }
 
-    public async Task<TaskItem?> EditTaskAsync(
+    public async Task<TaskEditResult> EditTaskAsync(
         int taskId,
         string? newName = null,
         string? newDescription = null)
@@ -149,11 +157,27 @@ public class TaskService
 
         if (task == null)
         {
-            return null;
+            return new TaskEditResult(
+                TaskEditStatus.NotFound,
+                null);
         }
 
         if (!string.IsNullOrWhiteSpace(newName))
         {
+            var normalizedName = newName.Trim().ToLower();
+
+            var nameTaken = await _dbContext.Tasks
+                .AnyAsync(x =>
+                    x.Id != taskId &&
+                    x.Name.Trim().ToLower() == normalizedName);
+
+            if (nameTaken)
+            {
+                return new TaskEditResult(
+                    TaskEditStatus.DuplicateName,
+                    task);
+            }
+
             task.Name = newName.Trim();
         }
 
@@ -166,6 +190,42 @@ public class TaskService
 
         await _dbContext.SaveChangesAsync();
 
-        return task;
+        return new TaskEditResult(
+            TaskEditStatus.Updated,
+            task);
     }
 }
+
+public enum TaskCreateStatus
+{
+    Created,
+    DuplicateName,
+    InvalidName,
+    UserNotFound
+}
+
+public sealed record TaskCreateResult(
+    TaskCreateStatus Status,
+    TaskItem? Task);
+
+public enum TaskFinishStatus
+{
+    Finished,
+    NotFound,
+    AlreadyCompleted
+}
+
+public sealed record TaskFinishResult(
+    TaskFinishStatus Status,
+    TaskItem? Task);
+
+public enum TaskEditStatus
+{
+    Updated,
+    NotFound,
+    DuplicateName
+}
+
+public sealed record TaskEditResult(
+    TaskEditStatus Status,
+    TaskItem? Task);

@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import type { User } from '~/types/users'
+
 import { getAccessToken } from '~/utils/auth'
 
-const users = ref<any[]>([])
+const { isAdmin, fetchCurrentUser } = useCurrentUser()
+
+const users = ref<User[]>([])
 const loadingUsers = ref(false)
 const usersError = ref<string | null>(null)
 const selectedUser = ref('')
@@ -38,9 +42,25 @@ const fetchUsers = async () => {
   usersError.value = null
 
   try {
+    const me = await fetchCurrentUser()
+
+    if (!me) {
+      usersError.value =
+        'Nie udało się ustalić zalogowanego użytkownika.'
+
+      return
+    }
+
+    if (!isAdmin.value) {
+      users.value = [me]
+      selectedUser.value = me.azureId
+
+      return
+    }
+
     const token = await getAccessToken()
 
-    users.value = await $fetch<any[]>(
+    users.value = await $fetch<User[]>(
       `${apiUrl}/api/users`,
       {
         headers: {
@@ -49,9 +69,10 @@ const fetchUsers = async () => {
       }
     )
 
-    if (users.value[0]?.azureId) {
-      selectedUser.value = users.value[0].azureId
-    }
+    selectedUser.value =
+      users.value.find(user => user.azureId === me.azureId)?.azureId ??
+      users.value[0]?.azureId ??
+      ''
   } catch (err) {
     console.error('Błąd pobierania użytkowników:', err)
 
@@ -110,7 +131,7 @@ const selectedUserName = computed(() => {
 
   return (
     user?.displayName ||
-    user?.mail ||
+    user?.email ||
     user?.userPrincipalName ||
     'Nieznany użytkownik'
   )
@@ -512,9 +533,15 @@ onMounted(fetchUsers)
         class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
       >
         <div
-          class="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr_auto]"
+          class="grid gap-4"
+          :class="
+            isAdmin
+              ? 'lg:grid-cols-[1.5fr_1fr_1fr_auto]'
+              : 'lg:grid-cols-[1fr_1fr_auto]'
+          "
         >
           <label
+            v-if="isAdmin"
             class="text-xs font-semibold uppercase tracking-wider text-slate-400"
           >
             Użytkownik
@@ -542,7 +569,7 @@ onMounted(fetchUsers)
               >
                 {{
                   user.displayName ||
-                  user.mail ||
+                  user.email ||
                   user.userPrincipalName ||
                   'Bez nazwy'
                 }}

@@ -13,7 +13,6 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<SyncSettings> SyncSettings => Set<SyncSettings>();
-    public DbSet<TeamsMessage> TeamsMessages { get; set; }
     public DbSet<WorkLog> WorkLogs { get; set; }
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<TaskComment> TaskComments { get; set; }
@@ -25,9 +24,6 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.AzureId)
             .IsUnique();
 
-        modelBuilder.Entity<TeamsMessage>()
-            .HasIndex(x => x.GraphMessageId)
-            .IsUnique();
         modelBuilder.Entity<TaskItem>()
             .HasOne(x => x.CreatedBy)
             .WithMany()

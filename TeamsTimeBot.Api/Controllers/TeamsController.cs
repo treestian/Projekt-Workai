@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using TeamsTimeBot.Api.Services;
 using Microsoft.AspNetCore.Authorization;
+using TeamsTimeBot.Api.Authorization;
 
 namespace TeamsTimeBot.Api.Controllers;
 [Authorize]
+[Admin]
 [ApiController]
 [Route("api/teams")]
 public class TeamsController : ControllerBase

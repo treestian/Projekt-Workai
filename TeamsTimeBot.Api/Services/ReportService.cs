@@ -100,26 +100,53 @@ public class ReportService
 
         var users =
             await _dbContext.Users
+                .AsNoTracking()
                 .Where(x => x.IsActive)
                 .OrderBy(x => x.DisplayName)
                 .ToListAsync();
 
+        var start = startDate.Date;
+        var end = endDate.Date.AddDays(1);
+
+        var userIds =
+            users
+                .Select(x => x.Id)
+                .ToList();
+
+        var logs =
+            await _dbContext.WorkLogs
+                .AsNoTracking()
+                .Where(x =>
+                    userIds.Contains(x.UserId) &&
+                    x.EndedAt.HasValue &&
+                    x.StartedAt >= start &&
+                    x.StartedAt < end)
+                .ToListAsync();
+
+        var taskNames =
+            await GetTaskNamesAsync(logs);
+
+        var logsByUser =
+            logs
+                .GroupBy(x => x.UserId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToList());
+
         var reports =
-            new List<WorkReport>();
-
-        foreach (var user in users)
-        {
-            var report =
-                await BuildUserReportAsync(
-                    user,
-                    startDate,
-                    endDate);
-
-            if (report != null)
-            {
-                reports.Add(report);
-            }
-        }
+            users
+                .Select(user =>
+                    BuildReport(
+                        user,
+                        logsByUser.TryGetValue(
+                            user.Id,
+                            out var userLogs)
+                            ? userLogs
+                            : [],
+                        taskNames,
+                        startDate,
+                        endDate))
+                .ToList();
 
         return new TeamWorkReport
         {
@@ -191,6 +218,20 @@ public class ReportService
         var logs =
             await query.ToListAsync();
 
+        var logUserIds =
+            logs
+                .Select(x => x.UserId)
+                .Distinct()
+                .ToList();
+
+        var userNames =
+            await _dbContext.Users
+                .AsNoTracking()
+                .Where(x => logUserIds.Contains(x.Id))
+                .ToDictionaryAsync(
+                    x => x.Id,
+                    x => x.DisplayName);
+
         var totalMinutes =
             logs.Sum(x =>
                 (int)Math.Round(
@@ -210,11 +251,6 @@ public class ReportService
                     .GroupBy(x => x.UserId)
                     .Select(group =>
                     {
-                        var user =
-                            _dbContext.Users
-                                .FirstOrDefault(
-                                    x => x.Id == group.Key);
-
                         var minutes =
                             group.Sum(x =>
                                 (int)Math.Round(
@@ -226,8 +262,11 @@ public class ReportService
                         {
                             UserId = group.Key,
                             UserName =
-                                user?.DisplayName
-                                ?? "Nieznany użytkownik",
+                                userNames.TryGetValue(
+                                    group.Key,
+                                    out var displayName)
+                                    ? displayName ?? "Nieznany użytkownik"
+                                    : "Nieznany użytkownik",
                             Minutes = minutes
                         };
                     })
@@ -254,6 +293,7 @@ public class ReportService
 
         var logs =
             await _dbContext.WorkLogs
+                .AsNoTracking()
                 .Where(x =>
                     x.UserId == user.Id &&
                     x.EndedAt.HasValue &&
@@ -261,20 +301,42 @@ public class ReportService
                     x.StartedAt < end)
                 .ToListAsync();
 
+        var taskNames =
+            await GetTaskNamesAsync(logs);
+
+        return BuildReport(
+            user,
+            logs,
+            taskNames,
+            startDate,
+            endDate);
+    }
+
+    private async Task<Dictionary<int, string>> GetTaskNamesAsync(
+        List<WorkLog> logs)
+    {
         var taskIds =
             logs
                 .Select(x => x.TaskId)
                 .Distinct()
                 .ToList();
 
-        var tasks =
-            await _dbContext.Tasks
-                .Where(x =>
-                    taskIds.Contains(x.Id))
-                .ToDictionaryAsync(
-                    x => x.Id,
-                    x => x.Name);
+        return await _dbContext.Tasks
+            .AsNoTracking()
+            .Where(x =>
+                taskIds.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => x.Name);
+    }
 
+    private static WorkReport BuildReport(
+        User user,
+        List<WorkLog> logs,
+        Dictionary<int, string> tasks,
+        DateTime startDate,
+        DateTime endDate)
+    {
         var taskReports =
             logs
                 .GroupBy(x => x.TaskId)

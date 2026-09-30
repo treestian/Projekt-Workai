@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TeamsTimeBot.Api.Data;
+using TeamsTimeBot.Api.DTOs;
 using TeamsTimeBot.Api.Models;
 
 namespace TeamsTimeBot.Api.Services;
@@ -13,13 +14,47 @@ public class UserService
         _db = db;
     }
 
-    public async Task<List<User>> GetUsersAsync()
+    public async Task<List<UserDto>> GetUsersAsync()
     {
-        return await _db.Users
+        var users = await _db.Users
             .AsNoTracking()
             .OrderBy(user => user.DisplayName)
             .ToListAsync();
+
+        return users
+            .Select(MapToDto)
+            .ToList();
     }
+
+    public async Task<UserDto?> GetByAzureIdAsync(string azureId)
+    {
+        var user = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.AzureId == azureId &&
+                x.IsActive);
+
+        return user == null
+            ? null
+            : MapToDto(user);
+    }
+
+    private static UserDto MapToDto(User user)
+    {
+        return new UserDto
+        {
+            Id = user.Id,
+            AzureId = user.AzureId,
+            DisplayName = user.DisplayName,
+            Email = user.Email,
+            UserPrincipalName = user.UserPrincipalName,
+            IsActive = user.IsActive,
+            Role = user.Role.ToString(),
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+    }
+
 
     public async Task<SyncSettings> GetSyncSettingsAsync()
     {

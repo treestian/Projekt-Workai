@@ -2,10 +2,6 @@ namespace TeamsTimeBot.Api.Models;
 
 public class LLMResponse
 {
-    public string? Message { get; set; }
-
-    public string? Action { get; set; }
-
     public int? TaskId { get; set; }
 
     public string? TaskName { get; set; }

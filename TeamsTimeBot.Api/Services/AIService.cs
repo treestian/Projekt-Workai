@@ -1,8 +1,6 @@
 #pragma warning disable OPENAI001
 
-using Azure.Identity;
 using OpenAI.Responses;
-using System.ClientModel.Primitives;
 using System.Text.Json;
 using TeamsTimeBot.Api.Models;
 
@@ -10,62 +8,22 @@ namespace TeamsTimeBot.Api.Services;
 
 public class AIService
 {
+    private const int MaxToolRounds = 8;
+
     private readonly ResponsesClient _client;
     private readonly string _deploymentName;
     private readonly ActionExecutor _actionExecutor;
+    private readonly ILogger<AIService> _logger;
 
     public AIService(
-        IConfiguration configuration,
-        ActionExecutor actionExecutor)
+        AzureOpenAIClientProvider clientProvider,
+        ActionExecutor actionExecutor,
+        ILogger<AIService> logger)
     {
         _actionExecutor = actionExecutor;
-
-        var endpoint =
-            configuration["AzureOpenAI:Endpoint"]
-            ?? throw new InvalidOperationException(
-                "AzureOpenAI:Endpoint is not configured.");
-
-        _deploymentName =
-            configuration["AzureOpenAI:DeploymentName"]
-            ?? throw new InvalidOperationException(
-                "AzureOpenAI:DeploymentName is not configured.");
-
-        var tenantId =
-            configuration["AzureAd:TenantId"]
-            ?? throw new InvalidOperationException(
-                "AzureAd:TenantId is not configured.");
-
-        var clientId =
-            configuration["AzureAd:ClientId"]
-            ?? throw new InvalidOperationException(
-                "AzureAd:ClientId is not configured.");
-
-        var clientSecret =
-            configuration["AzureAd:ClientSecret"]
-            ?? throw new InvalidOperationException(
-                "AzureAd:ClientSecret is not configured.");
-
-        var credential =
-            new ClientSecretCredential(
-                tenantId,
-                clientId,
-                clientSecret);
-
-        var policy =
-            new BearerTokenPolicy(
-                credential,
-                "https://cognitiveservices.azure.com/.default");
-
-        var options =
-            new ResponsesClientOptions
-            {
-                Endpoint = new Uri(endpoint)
-            };
-
-        _client =
-            new ResponsesClient(
-                policy,
-                options);
+        _logger = logger;
+        _client = clientProvider.Client;
+        _deploymentName = clientProvider.DeploymentName;
     }
 
     // =========================================================
@@ -74,26 +32,7 @@ public class AIService
 
     private static DateTime GetPolandDateTime()
     {
-        TimeZoneInfo timeZone;
-
-        try
-        {
-            // macOS / Linux
-            timeZone =
-                TimeZoneInfo.FindSystemTimeZoneById(
-                    "Europe/Warsaw");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            // Windows
-            timeZone =
-                TimeZoneInfo.FindSystemTimeZoneById(
-                    "Central European Standard Time");
-        }
-
-        return TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.UtcNow,
-            timeZone);
+        return PolandTime.Now;
     }
 
     // =========================================================
@@ -102,7 +41,8 @@ public class AIService
 
     public async Task<string?> GetResponseAsync(
         List<ConversationMessage> messages,
-        string userAzureId)
+        string userAzureId,
+        CancellationToken cancellationToken = default)
     {
         var inputItems =
             new List<ResponseItem>();
@@ -220,6 +160,11 @@ public class AIService
                 - manual_time dodaje ręcznie podany czas (czas pracy mozna zalgowac tylko sobie)
                 - finish_task oznacza zadanie jako zakończone.
 
+                Zakończenie zadania zatrzymuje wszystkie trwające na nim pomiary,
+                także pomiary innych osób. Jeżeli wynik finish_task zawiera
+                stoppedWorkLogs większe od zera, poinformuj użytkownika,
+                ile pomiarów zostało przy tej okazji zatrzymanych.
+
                 =========================================================
                 RAPORTY CZASU PRACY
                 =========================================================
@@ -233,6 +178,15 @@ public class AIService
                 - "Pokaż mój czas z tego miesiąca."
 
                 W takich przypadkach użyj get_my_work_report.
+
+                Użytkownik może też poprosić o raport czasu poświęconego na konkretne zadanie.
+
+                Przykłady:
+                - "Ile czasu poszło na zadanie X?"
+                - "Ile godzin zajęła nam integracja z Graph?"
+
+                W takich przypadkach użyj get_task_work_report.
+                Pracownik zobaczy w nim wyłącznie swój czas, administrator czas wszystkich osób.
 
                 Administrator może dodatkowo otrzymywać:
                 - raport konkretnego pracownika,
@@ -294,12 +248,20 @@ public class AIService
                 - AMBIGUOUS oznacza kilka pasujących elementów.
                 - ALREADY_ACTIVE oznacza, że pomiar już trwa.
                 - NO_ACTIVE_WORK oznacza brak aktywnego pomiaru.
+                - DUPLICATE_TASK_NAME oznacza, że zadanie o tej nazwie już istnieje.
+                - ALREADY_COMPLETED oznacza, że zadanie jest już zakończone.
+                - MISSING_TASK_NAME oznacza brak nazwy zadania.
+                - MISSING_COMMENT oznacza brak treści komentarza.
+                - MISSING_MANUAL_TIME oznacza brak lub nieprawidłową liczbę minut.
                 - FORBIDDEN oznacza brak uprawnień.
                 - ERROR oznacza błąd operacji.
 
                 - Jeżeli wynik to SUCCESS, potwierdź użytkownikowi wykonanie operacji.
                 - Jeżeli wynik to AMBIGUOUS, wymień konkretne nazwy wszystkich kandydatów.
                 - Jeżeli wynik to FORBIDDEN, poinformuj o braku uprawnień.
+                - Jeżeli wynik to DUPLICATE_TASK_NAME, poinformuj, że zadanie o takiej nazwie już istnieje, i zaproponuj inną nazwę.
+                - Jeżeli wynik to ALREADY_COMPLETED, poinformuj, że zadanie zostało już wcześniej zakończone.
+                - Jeżeli wynik to MISSING_MANUAL_TIME, poproś o podanie liczby godzin lub minut. Maksymalnie można zalogować 24 godziny na jeden wpis.
                 - Nie wykonuj ponownie tej samej operacji bez nowej prośby użytkownika.
 
                 """));
@@ -641,6 +603,43 @@ public class AIService
                         """),
                 strictModeEnabled: false);
         
+        var taskWorkReportTool =
+            ResponseTool.CreateFunctionTool(
+                functionName: "get_task_work_report",
+                functionDescription:
+                    "Pobiera raport czasu pracy nad konkretnym zadaniem. Pracownik widzi wyłącznie swój czas, administrator czas wszystkich osób.",
+                functionParameters:
+                    BinaryData.FromString(
+                        """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "taskId": {
+                              "type": "integer",
+                              "description": "Identyfikator zadania, jeżeli użytkownik go podał."
+                            },
+                            "taskName": {
+                              "type": "string",
+                              "description": "Nazwa zadania."
+                            },
+                            "startDate": {
+                              "type": "string",
+                              "description": "Początek okresu. Format YYYY-MM-DD."
+                            },
+                            "endDate": {
+                              "type": "string",
+                              "description": "Koniec okresu. Format YYYY-MM-DD."
+                            }
+                          },
+                          "required": [
+                            "startDate",
+                            "endDate"
+                          ],
+                          "additionalProperties": false
+                        }
+                        """),
+                strictModeEnabled: false);
+
             var findUserTool =
                 ResponseTool.CreateFunctionTool(
                     functionName: "find_user",
@@ -668,8 +667,10 @@ public class AIService
         // PĘTLA TOOL CALLING
         // =========================================================
 
-        while (true)
+        for (var round = 0; round < MaxToolRounds; round++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var options =
                 new CreateResponseOptions
                 {
@@ -688,6 +689,7 @@ public class AIService
             options.Tools.Add(myWorkReportTool);
             options.Tools.Add(userWorkReportTool);
             options.Tools.Add(teamWorkReportTool);
+            options.Tools.Add(taskWorkReportTool);
             options.Tools.Add(findUserTool);
 
             foreach (var item in inputItems)
@@ -697,16 +699,8 @@ public class AIService
 
             var response =
                 await _client.CreateResponseAsync(
-                    options);
-
-            Console.WriteLine(
-                "========== AI RESPONSE ==========");
-
-            Console.WriteLine(
-                response.Value.GetOutputText());
-
-            Console.WriteLine(
-                "=================================");
+                    options,
+                    cancellationToken);
 
             // =====================================================
             // Dodaj odpowiedź modelu do historii wejściowej.
@@ -744,11 +738,10 @@ public class AIService
 
             foreach (var functionCall in functionCalls)
             {
-                Console.WriteLine(
-                    $"TOOL: {functionCall.FunctionName}");
-
-                Console.WriteLine(
-                    $"ARGUMENTS: {functionCall.FunctionArguments}");
+                _logger.LogInformation(
+                    "Wywołanie narzędzia {ToolName} (runda {Round}).",
+                    functionCall.FunctionName,
+                    round + 1);
 
                 string functionOutput;
 
@@ -761,8 +754,10 @@ public class AIService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(
-                        $"TOOL ERROR: {ex}");
+                    _logger.LogError(
+                        ex,
+                        "Błąd wykonania narzędzia {ToolName}.",
+                        functionCall.FunctionName);
 
                     functionOutput =
                         JsonSerializer.Serialize(
@@ -773,9 +768,6 @@ public class AIService
                                     "Nie udało się wykonać operacji."
                             });
                 }
-
-                Console.WriteLine(
-                    $"TOOL RESULT: {functionOutput}");
 
                 // =================================================
                 // Wynik toola wraca do tego samego AI
@@ -791,6 +783,19 @@ public class AIService
             // Pętla wykona kolejne wywołanie Responses API.
             // =====================================================
         }
+
+        // =========================================================
+        // Wyczerpany limit rund — model nie doszedł do odpowiedzi.
+        // =========================================================
+
+        _logger.LogWarning(
+            "Przerwano pętlę narzędzi po {MaxToolRounds} rundach " +
+            "dla użytkownika {UserAzureId}.",
+            MaxToolRounds,
+            userAzureId);
+
+        return "Nie udało mi się dokończyć tej operacji. "
+            + "Spróbuj sformułować prośbę inaczej.";
     }
 
     // =========================================================
@@ -923,6 +928,60 @@ public class AIService
                 await _actionExecutor
                     .GetTeamWorkReportAsync(
                         userAzureId,
+                        startDate.Value,
+                        endDate.Value);
+
+            return JsonSerializer.Serialize(
+                report);
+        }
+
+        // =========================================================
+        // RAPORT - KONKRETNE ZADANIE
+        // =========================================================
+
+        if (functionCall.FunctionName ==
+            "get_task_work_report")
+        {
+            var startDate =
+                GetDate(
+                    root,
+                    "startDate");
+
+            var endDate =
+                GetDate(
+                    root,
+                    "endDate");
+
+            if (!startDate.HasValue ||
+                !endDate.HasValue)
+            {
+                return JsonSerializer.Serialize(
+                    new
+                    {
+                        status = "MISSING_DATE"
+                    });
+            }
+
+            int? reportTaskId = null;
+
+            if (root.TryGetProperty(
+                    "taskId",
+                    out var reportTaskIdElement) &&
+                reportTaskIdElement.ValueKind ==
+                    JsonValueKind.Number)
+            {
+                reportTaskId =
+                    reportTaskIdElement.GetInt32();
+            }
+
+            var report =
+                await _actionExecutor
+                    .GetTaskWorkReportAsync(
+                        userAzureId,
+                        reportTaskId,
+                        GetString(
+                            root,
+                            "taskName"),
                         startDate.Value,
                         endDate.Value);
 
@@ -1134,9 +1193,10 @@ public class AIService
         return JsonSerializer.Serialize(
             new
             {
-                status = result.StatusCode,
+                status = result.Result,
                 taskId = result.TaskId,
                 taskName = result.TaskName,
+                stoppedWorkLogs = result.StoppedWorkLogs,
                 candidates = result.Candidates
             });
     }

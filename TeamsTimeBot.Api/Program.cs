@@ -40,6 +40,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddHostedService<UserSyncBackgroundService>();
 builder.Services.AddScoped<WorkLogService>();
+builder.Services.AddSingleton<AzureOpenAIClientProvider>();
 builder.Services.AddScoped<AIService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<CommentService>();
@@ -50,7 +51,6 @@ builder.Services.AddScoped<ActionExecutor>();
 builder.Services.AddScoped<AuthorizationService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<NotificationService>();
 
 builder.Services.AddSingleton<
     BotFrameworkAuthentication,

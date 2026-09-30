@@ -9,7 +9,7 @@ namespace TeamsTimeBot.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/worklogs")]
-[Admin]
+
 public class WorkLogsController : ControllerBase
 {
     private readonly WorkLogService _workLogService;
@@ -23,7 +23,7 @@ public class WorkLogsController : ControllerBase
         _authorizationService = authorizationService;
     }
 
-    [Admin]
+
     [HttpGet("active")]
     public async Task<IActionResult> GetActiveWork()
     {
@@ -32,7 +32,9 @@ public class WorkLogsController : ControllerBase
         if (string.IsNullOrWhiteSpace(userAzureId))
         {
             return Unauthorized();
-        }
+        }  
+
+        var isAdmin = await _authorizationService.IsAdminAsync(userAzureId);
 
         var activeWork = await _workLogService.GetActiveWorkAsync(
             userAzureId,

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TeamsTimeBot.Api.Services;
 using Microsoft.Identity.Web;
 using TeamsTimeBot.Api.Authorization;
+using TeamsTimeBot.Api.Services;
 
 namespace TeamsTimeBot.Api.Controllers;
 
@@ -13,22 +13,45 @@ public class UsersController : ControllerBase
 {
     private readonly UserSyncService _syncService;
     private readonly UserService _userService;
+
     public UsersController(
         UserSyncService syncService,
-        UserService userService,
-        AuthorizationService authorizationService)
+        UserService userService)
     {
         _syncService = syncService;
         _userService = userService;
     }
 
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMe()
+    {
+        var azureId = User.GetObjectId();
+
+        if (string.IsNullOrWhiteSpace(azureId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userService.GetByAzureIdAsync(azureId);
+
+        if (user == null)
+        {
+            return NotFound(
+                "Twoje konto nie zostało jeszcze zsynchronizowane z Azure AD.");
+        }
+
+        return Ok(user);
+    }
+
     [HttpGet]
+    [Admin]
     public async Task<IActionResult> GetUsers()
     {
         var users = await _userService.GetUsersAsync();
 
         return Ok(users);
     }
+
 
     [HttpPost("sync")]
     [Admin]

@@ -10,10 +10,14 @@ namespace TeamsTimeBot.Api.Services;
 public class TaskResolver
 {
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<TaskResolver> _logger;
 
-    public TaskResolver(AppDbContext dbContext)
+    public TaskResolver(
+        AppDbContext dbContext,
+        ILogger<TaskResolver> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     public async Task<TaskResolutionResult> ResolveAsync(
@@ -66,7 +70,7 @@ public class TaskResolver
         // =========================================================
 
         var query =
-            _dbContext.Tasks.AsQueryable();
+            _dbContext.Tasks.AsNoTracking();
 
         if (!includeCompleted)
         {
@@ -95,10 +99,9 @@ public class TaskResolver
         // Jedno dokładne dopasowanie
         if (exactMatches.Count == 1)
         {
-            Console.WriteLine(
-                $"TASK RESOLVER: Exact match -> " +
-                $"ID={exactMatches[0].Id}, " +
-                $"Name={exactMatches[0].Name}");
+            _logger.LogDebug(
+                "TaskResolver: dokładne dopasowanie, TaskId {TaskId}.",
+                exactMatches[0].Id);
 
             return TaskResolutionResult.Found(
                 exactMatches[0]);
@@ -107,9 +110,9 @@ public class TaskResolver
         // Kilka dokładnie takich samych nazw
         if (exactMatches.Count > 1)
         {
-            Console.WriteLine(
-                $"TASK RESOLVER: Ambiguous exact match -> " +
-                $"found {exactMatches.Count} tasks.");
+            _logger.LogDebug(
+                "TaskResolver: {Count} zadań o identycznej nazwie.",
+                exactMatches.Count);
 
             return TaskResolutionResult.Ambiguous(
                 exactMatches);
@@ -128,10 +131,9 @@ public class TaskResolver
 
         if (phraseMatches.Count == 1)
         {
-            Console.WriteLine(
-                $"TASK RESOLVER: Phrase match -> " +
-                $"ID={phraseMatches[0].Id}, " +
-                $"Name={phraseMatches[0].Name}");
+            _logger.LogDebug(
+                "TaskResolver: dopasowanie frazy, TaskId {TaskId}.",
+                phraseMatches[0].Id);
 
             return TaskResolutionResult.Found(
                 phraseMatches[0]);
@@ -144,9 +146,9 @@ public class TaskResolver
                     phraseMatches,
                     searchText);
 
-            Console.WriteLine(
-                $"TASK RESOLVER: Ambiguous phrase match -> " +
-                $"found {phraseMatches.Count} tasks.");
+            _logger.LogDebug(
+                "TaskResolver: {Count} zadań pasujących frazą.",
+                phraseMatches.Count);
 
             return TaskResolutionResult.Ambiguous(
                 ranked);
@@ -185,10 +187,9 @@ public class TaskResolver
 
         if (wordMatches.Count == 1)
         {
-            Console.WriteLine(
-                $"TASK RESOLVER: Word match -> " +
-                $"ID={wordMatches[0].Id}, " +
-                $"Name={wordMatches[0].Name}");
+            _logger.LogDebug(
+                "TaskResolver: dopasowanie słów, TaskId {TaskId}.",
+                wordMatches[0].Id);
 
             return TaskResolutionResult.Found(
                 wordMatches[0]);
@@ -201,9 +202,9 @@ public class TaskResolver
                     wordMatches,
                     searchText);
 
-            Console.WriteLine(
-                $"TASK RESOLVER: Ambiguous word match -> " +
-                $"found {wordMatches.Count} tasks.");
+            _logger.LogDebug(
+                "TaskResolver: {Count} zadań pasujących słowami.",
+                wordMatches.Count);
 
             return TaskResolutionResult.Ambiguous(
                 ranked);
@@ -228,10 +229,9 @@ public class TaskResolver
 
         if (partialMatches.Count == 1)
         {
-            Console.WriteLine(
-                $"TASK RESOLVER: Partial match -> " +
-                $"ID={partialMatches[0].Id}, " +
-                $"Name={partialMatches[0].Name}");
+            _logger.LogDebug(
+                "TaskResolver: dopasowanie częściowe, TaskId {TaskId}.",
+                partialMatches[0].Id);
 
             return TaskResolutionResult.Found(
                 partialMatches[0]);
@@ -244,9 +244,9 @@ public class TaskResolver
                     partialMatches,
                     searchText);
 
-            Console.WriteLine(
-                $"TASK RESOLVER: Ambiguous partial match -> " +
-                $"found {partialMatches.Count} tasks.");
+            _logger.LogDebug(
+                "TaskResolver: {Count} zadań pasujących częściowo.",
+                partialMatches.Count);
 
             return TaskResolutionResult.Ambiguous(
                 ranked);
@@ -256,8 +256,8 @@ public class TaskResolver
         // 8. Nic nie znaleziono
         // =========================================================
 
-        Console.WriteLine(
-            $"TASK RESOLVER: Not found -> \"{taskName}\"");
+        _logger.LogDebug(
+            "TaskResolver: brak dopasowania.");
 
         return TaskResolutionResult.NotFound();
     }

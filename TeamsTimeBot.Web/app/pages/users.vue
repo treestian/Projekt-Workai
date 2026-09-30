@@ -5,6 +5,10 @@ import type {
 	UserSyncSettings
 } from '~/types/users'
 
+definePageMeta({
+	middleware: 'admin'
+})
+
 const {
 	users,
 	loading,

@@ -6,6 +6,8 @@ namespace TeamsTimeBot.Api.Services;
 
 public class ConversationService
 {
+    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(30);
+
     private readonly AppDbContext _dbContext;
 
     public ConversationService(AppDbContext dbContext)
@@ -13,30 +15,42 @@ public class ConversationService
         _dbContext = dbContext;
     }
 
-    public async Task<PendingConversation?> GetPendingAsync(
-        string userAzureId)
-    {
-        return await _dbContext.PendingConversations
-            .FirstOrDefaultAsync(x =>
-                x.UserAzureId == userAzureId &&
-                x.ExpiresAt > DateTime.UtcNow);
-    }
-
     public async Task<PendingConversation> GetOrCreateAsync(
         string userAzureId)
     {
-        var existing = await GetPendingAsync(userAzureId);
+        var now = DateTime.UtcNow;
 
-        if (existing != null)
+        var conversations = await _dbContext.PendingConversations
+            .Where(x => x.UserAzureId == userAzureId)
+            .ToListAsync();
+
+        var expired = conversations
+            .Where(x => x.ExpiresAt <= now)
+            .ToList();
+
+        if (expired.Count > 0)
         {
-            return existing;
+            _dbContext.PendingConversations.RemoveRange(expired);
+        }
+
+        var active = conversations
+            .FirstOrDefault(x => x.ExpiresAt > now);
+
+        if (active != null)
+        {
+            if (expired.Count > 0)
+            {
+                await _dbContext.SaveChangesAsync();
+            }
+
+            return active;
         }
 
         var conversation = new PendingConversation
         {
             UserAzureId = userAzureId,
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+            CreatedAt = now,
+            ExpiresAt = now.Add(Lifetime)
         };
 
         _dbContext.PendingConversations.Add(conversation);
@@ -46,64 +60,9 @@ public class ConversationService
         return conversation;
     }
 
-    public async Task AddMessageAsync(
-        string userAzureId,
-        string role,
-        string content)
+    public async Task SaveAsync(PendingConversation conversation)
     {
-        var conversation = await GetOrCreateAsync(userAzureId);
-
-        conversation.Messages.Add(
-            new ConversationMessage
-            {
-                Role = role,
-                Content = content
-            });
-
-        conversation.ExpiresAt =
-            DateTime.UtcNow.AddMinutes(30);
-
-        await _dbContext.SaveChangesAsync();
-    }
-
-    public async Task SaveAsync(
-        PendingConversation conversation)
-    {
-        conversation.ExpiresAt =
-            DateTime.UtcNow.AddMinutes(30);
-
-        var existing = await _dbContext.PendingConversations
-            .FirstOrDefaultAsync(x =>
-                x.UserAzureId == conversation.UserAzureId);
-
-        if (existing == null)
-        {
-            _dbContext.PendingConversations.Add(conversation);
-        }
-        else
-        {
-            existing.Messages = conversation.Messages;
-            existing.CreatedAt = conversation.CreatedAt;
-            existing.ExpiresAt = conversation.ExpiresAt;
-        }
-
-        await _dbContext.SaveChangesAsync();
-    }
-
-    public async Task DeleteAsync(
-        string userAzureId)
-    {
-        var conversations = await _dbContext.PendingConversations
-            .Where(x => x.UserAzureId == userAzureId)
-            .ToListAsync();
-
-        if (conversations.Count == 0)
-        {
-            return;
-        }
-
-        _dbContext.PendingConversations.RemoveRange(
-            conversations);
+        conversation.ExpiresAt = DateTime.UtcNow.Add(Lifetime);
 
         await _dbContext.SaveChangesAsync();
     }
